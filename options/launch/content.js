@@ -3,11 +3,16 @@ window.WEC_COPY = {
   sub: "It's a founder-led program for people serious about building",
   subHl: 'something.',
   places: { taken: 63, total: 75 },
-  marquee: ['Creating something people want', 'What you actually need to start', 'Brand', 'Pitching', 'Bi-weekly Sunday build sessions', 'Demo nights'],
+  marquee: ['Build', 'Discover', 'Connect', 'Explore', 'Contribute', 'By founders, for founders'],
+  // The five pillars, written by Owen and Sebastian and sent 11 Sept 2026.
+  // Every line below is theirs. The bullets are phrases lifted from their own
+  // text rather than invented, so nothing here is placeholder copy.
   principles: [
-    { t: 'Build, do not just listen', p: 'Bi-weekly Sunday build sessions. Workshops run by founders who have done it, not by people who have read about it.', l: ['Creating something people want', 'What you actually need to start', 'Brand', 'Pitching'] },
-    { t: 'Real founders, real time', p: 'Speaker sessions, one to one mentoring and small group check-ins. Everyone in front of the room has run the thing they are talking about.', l: ['Founder speaker sessions', 'One to one mentoring', 'Small group check-ins'] },
-    { t: 'Then prove it', p: 'Pitch competitions and demo nights. You show what actually moved, in front of the room, with numbers.', l: ['Inaugural dinner, October', 'Pitch competition, November', 'Pitch competition, March'] }
+    { t: 'Build: take action', p: 'We believe entrepreneurship is learned by doing. We offer recurring resources, accountability, peer support, and a low-pressure environment where students can turn ideas into action and move their venture forward.', l: ['Recurring resources', 'Accountability', 'Peer support'] },
+    { t: 'Discover: learn from reality', p: 'Entrepreneurship is more than success stories. We expose students to founders, investors, and professionals who can share the real experience behind entrepreneurship.', l: ['The decisions and the risks', 'The failures and trade-offs', 'The opportunities'] },
+    { t: 'Connect: build your network', p: 'Great companies and great careers are built through people. We foster meaningful connections between student founders, alumni, entrepreneurs, and the broader Morrissette ecosystem.', l: ['Student founders', 'Alumni and entrepreneurs', 'The broader ecosystem'] },
+    { t: 'Explore: find your path', p: 'You do not already need to be a founder to belong here. WEC is a place to explore whether entrepreneurship is right for you and to discover different paths within Western’s entrepreneurial ecosystem.', l: ['Develop entrepreneurial skills', 'Meet potential co-founders', 'Test ideas'] },
+    { t: 'Contribute: help each other grow', p: 'Entrepreneurship should not be a solo journey. We build a community where members help each other. Everyone contributes to making the people around them better.', l: ['Feedback', 'Introductions', 'Simply showing up'] }
   ],
   term: [
     ['OCT', 'Inaugural dinner', 'The cohort meets. Everyone says what they are building in five minutes, no slides.'],
