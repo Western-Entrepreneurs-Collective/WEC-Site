@@ -1,0 +1,43 @@
+:root{
+  --font-sans:"Archivo","Helvetica Neue",Helvetica,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  /* Lockup descriptor approximation only. Do not set body copy in this. */
+  --font-lockup:"Montserrat","Archivo",sans-serif;
+
+  --weight-regular:400;
+  --weight-medium:500;
+  --weight-semibold:600;
+  --weight-bold:700;
+
+  /* Type scale. Dense, few steps, big jumps at the top. */
+  --size-display:clamp(44px,6.4vw,84px);
+  --size-h1:clamp(34px,4.2vw,54px);
+  --size-h2:clamp(26px,2.6vw,34px);
+  --size-h3:22px;
+  --size-h4:18px;
+  --size-body-lg:19px;
+  --size-body:16px;
+  --size-body-sm:14px;
+  --size-caption:13px;
+  --size-label:12px;
+
+  --leading-tight:1.02;
+  --leading-snug:1.14;
+  --leading-heading:1.2;
+  --leading-body:1.55;
+  --leading-loose:1.7;
+
+  --tracking-display:-0.028em;
+  --tracking-heading:-0.018em;
+  --tracking-body:0;
+  --tracking-label:0.14em;   /* mono eyebrows and labels */
+  --tracking-lockup:0.18em;  /* descriptor lettering in the lockup */
+
+  /* Semantic text roles */
+  --text-display:var(--weight-bold) var(--size-display)/var(--leading-tight) var(--font-sans);
+  --text-h1:var(--weight-bold) var(--size-h1)/var(--leading-snug) var(--font-sans);
+  --text-h2:var(--weight-semibold) var(--size-h2)/var(--leading-heading) var(--font-sans);
+  --text-h3:var(--weight-semibold) var(--size-h3)/var(--leading-heading) var(--font-sans);
+  --text-body-role:var(--weight-regular) var(--size-body)/var(--leading-body) var(--font-sans);
+  --text-label-role:var(--weight-semibold) var(--size-label)/1.1 var(--font-mono);
+}

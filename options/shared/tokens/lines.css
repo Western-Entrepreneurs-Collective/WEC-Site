@@ -1,0 +1,27 @@
+:root{
+  /* Corners are square. This is a hard rule. The only rounded object in the
+     identity is the app icon tile. */
+  --radius-none:0px;
+  --radius-app-icon:22.5%;
+
+  --border-width:1px;
+  --border-width-strong:2px;
+  --rule:1px solid var(--border-hairline);
+  --rule-strong:2px solid var(--border-strong);
+  --rule-brand:2px solid var(--border-brand);
+
+  /* No drop shadows anywhere. Separation is done with rules and ground shifts. */
+  --shadow-none:none;
+  --scrim:rgba(20,16,24,.62);
+
+  /* The green slash. The only graphic device in the system.
+     A parallelogram skewed 22 degrees, lifted from the E of the wordmark. */
+  --slash-skew:-22deg; /* @kind other */
+  --slash-color:var(--wec-green);
+  --slash-thickness-sm:4px;
+  --slash-thickness-md:8px;
+  --slash-thickness-lg:14px;
+  --slash-width-sm:18px;
+  --slash-width-md:32px;
+  --slash-width-lg:64px;
+}

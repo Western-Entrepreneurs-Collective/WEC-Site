@@ -1,0 +1,67 @@
+/* WEC colour system. Three values. Nothing else.
+   Purple is the identity. Green is the slash, and only the slash.
+   Every other value below is a tint or shade of those three, used for
+   rules, surfaces and disabled states, never as a new brand colour. */
+:root{
+  /* Base */
+  --wec-purple:#4F2781;
+  --wec-green:#014939;
+  --wec-ground:#FEFEFE;
+  --wec-ink:#141018;
+
+  /* Purple ramp (mixes of purple with ground or ink; not new hues) */
+  --purple-900:#2A1445;
+  --purple-800:#3A1C5E;
+  --purple-700:#4F2781;
+  --purple-600:#63369B;
+  --purple-200:#C9B9DE;
+  --purple-100:#E6DEF0;
+  --purple-050:#F4F0F9;
+
+  /* Green is deliberately flat. One value. A second green is off brand. */
+  --green-700:#014939;
+  --green-100:#D3E0DC;
+
+  /* Neutrals: warmed toward the purple so nothing reads as cold grey */
+  --neutral-900:#141018;
+  --neutral-700:#3B3541;
+  --neutral-500:#6B6474;
+  --neutral-400:#8E8897;
+  --neutral-300:#C4C0CA;
+  --neutral-200:#E2E0E6;
+  --neutral-100:#EFEEF1;
+  --neutral-050:#F7F6F8;
+
+  /* Semantic aliases */
+  --surface-page:var(--wec-ground);
+  --surface-raised:#FFFFFF;
+  --surface-sunken:var(--neutral-050);
+  --surface-invert:var(--wec-purple);
+  --surface-invert-deep:var(--purple-900);
+  --surface-tint:var(--purple-050);
+
+  --text-primary:var(--neutral-900);
+  --text-secondary:var(--neutral-500);
+  --text-muted:var(--neutral-400);
+  --text-brand:var(--wec-purple);
+  --text-on-invert:var(--wec-ground);
+  --text-on-invert-muted:var(--purple-200);
+  --text-accent:var(--wec-green);
+
+  --accent-slash:var(--wec-green);
+
+  --border-hairline:var(--neutral-200);
+  --border-strong:var(--neutral-900);
+  --border-brand:var(--wec-purple);
+  --border-on-invert:rgba(254,254,254,.28);
+
+  --action-primary-bg:var(--wec-purple);
+  --action-primary-bg-hover:var(--purple-800);
+  --action-primary-bg-active:var(--purple-900);
+  --action-primary-text:var(--wec-ground);
+  --action-secondary-text:var(--wec-purple);
+  --action-disabled-bg:var(--neutral-200);
+  --action-disabled-text:var(--neutral-400);
+
+  --focus-ring:var(--wec-green);
+}

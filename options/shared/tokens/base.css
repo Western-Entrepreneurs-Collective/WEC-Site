@@ -1,0 +1,17 @@
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--surface-page);color:var(--text-primary);font:var(--text-body-role);letter-spacing:var(--tracking-body);-webkit-font-smoothing:antialiased;text-wrap:pretty}
+h1,h2,h3,h4{margin:0;letter-spacing:var(--tracking-heading);text-wrap:balance}
+h1{font:var(--text-h1)}h2{font:var(--text-h2)}h3{font:var(--text-h3)}
+p{margin:0}
+a{color:var(--text-brand);text-decoration:none;border-bottom:1px solid var(--purple-200);transition:var(--transition-control)}
+a:hover{color:var(--purple-800);border-bottom-color:var(--wec-green)}
+::selection{background:var(--wec-green);color:var(--wec-ground)}
+:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
+
+/* The green slash. Use as a rule between sections, a bullet, an underline,
+   or a button accent. Never invent a second device. */
+.wec-slash{display:inline-block;width:var(--slash-width-md);height:var(--slash-thickness-md);background:var(--slash-color);transform:skewX(var(--slash-skew));flex:none}
+.wec-slash--sm{width:var(--slash-width-sm);height:var(--slash-thickness-sm)}
+.wec-slash--lg{width:var(--slash-width-lg);height:var(--slash-thickness-lg)}
+.wec-slash-rule{display:block;width:100%;height:var(--slash-thickness-sm);background:repeating-linear-gradient(var(--slash-skew,-22deg),var(--wec-green) 0 24px,transparent 24px 36px)}
+.wec-label{font:var(--text-label-role);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--text-secondary)}
