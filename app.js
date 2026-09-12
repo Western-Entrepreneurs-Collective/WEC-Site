@@ -208,7 +208,10 @@ function applicationMailto(v) {
     "Hardest part:",
     v.hard || "Not answered"
   ];
-  return "mailto:" + encodeURIComponent(COPY.email) +
+  // The address is NOT percent-encoded. encodeURIComponent turns "@" into "%40" and
+  // some mail clients will not parse mailto:hello%40wecollective.ca as a recipient.
+  // Only the subject and body are encoded, which is where arbitrary text can appear.
+  return "mailto:" + COPY.email +
     "?subject=" + encodeURIComponent("Founding member application, " + v.name) +
     "&body=" + encodeURIComponent(lines.join("\n"));
 }
@@ -242,7 +245,7 @@ function JoinPage({ go }) {
   const filled = [v.name, v.email, v.building, v.evidence, v.link].filter((x) => x.trim()).length;
   const pct = Math.round(filled / 5 * 100);
   if (done) {
-    return /* @__PURE__ */ React.createElement("section", { className: "done" }, /* @__PURE__ */ React.createElement("div", { className: "wrap done-in" }, /* @__PURE__ */ React.createElement(Sl, { w: 64, h: 12, style: { display: "block" } }), /* @__PURE__ */ React.createElement("h1", { className: "done-t" }, "One more step."), /* @__PURE__ */ React.createElement("p", { className: "done-p" }, "Your email app should have opened with your answers already written out. ", /* @__PURE__ */ React.createElement("strong", null, "Press send in that email to finish your application."), " Nothing reaches us until you do. If nothing opened, ", /* @__PURE__ */ React.createElement("a", { href: applicationMailto(v) }, "open it here"), " or email your answers to ", /* @__PURE__ */ React.createElement("strong", null, COPY.email), ". We read applications in the order they arrive and reply to everyone within a week."), /* @__PURE__ */ React.createElement("div", { className: "done-rows" }, [["Send the email", "Not done until you press send"], ["Decisions", "Rolling, within a week"], ["First session", "Inaugural dinner, October"]].map(([k, t]) => /* @__PURE__ */ React.createElement("div", { className: "done-row", key: k }, /* @__PURE__ */ React.createElement("span", null, k), /* @__PURE__ */ React.createElement("span", { className: "mono" }, t)))), /* @__PURE__ */ React.createElement("div", { className: "hero-actions" }, /* @__PURE__ */ React.createElement("a", { href: "#/program", onClick: (e) => {
+    return /* @__PURE__ */ React.createElement("section", { className: "done" }, /* @__PURE__ */ React.createElement("div", { className: "wrap done-in" }, /* @__PURE__ */ React.createElement(Sl, { w: 64, h: 12, style: { display: "block" } }), /* @__PURE__ */ React.createElement("h1", { className: "done-t" }, "One more step."), /* @__PURE__ */ React.createElement("p", { className: "done-p" }, "Your email app should have opened with your answers already written out. ", /* @__PURE__ */ React.createElement("strong", null, "Press send in that email to finish your application."), " Nothing reaches us until you do. If nothing opened, ", /* @__PURE__ */ React.createElement("a", { href: applicationMailto(v), style: { color: "inherit", textDecoration: "underline", fontWeight: 600 } }, "open it here"), " or email your answers to ", /* @__PURE__ */ React.createElement("strong", null, COPY.email), ". We read applications in the order they arrive and reply to everyone within a week."), /* @__PURE__ */ React.createElement("div", { className: "done-rows" }, [["Send the email", "Not done until you press send"], ["Decisions", "Rolling, within a week"], ["First session", "Inaugural dinner, October"]].map(([k, t]) => /* @__PURE__ */ React.createElement("div", { className: "done-row", key: k }, /* @__PURE__ */ React.createElement("span", null, k), /* @__PURE__ */ React.createElement("span", { className: "mono" }, t)))), /* @__PURE__ */ React.createElement("div", { className: "hero-actions" }, /* @__PURE__ */ React.createElement("a", { href: "#/program", onClick: (e) => {
       e.preventDefault();
       go("/program");
     }, className: "btn btn-light" }, /* @__PURE__ */ React.createElement(Sl, { w: 13 }), "Read what happens next"))));
