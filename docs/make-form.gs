@@ -97,12 +97,10 @@ function makeWecApplicationsForm() {
 
   var response = form.createResponse();
   for (var title in placeholders) {
-    var item = items[title];
-    var typed = item.getType();
-    var casted = typed === FormApp.ItemType.MULTIPLE_CHOICE ? item.asMultipleChoiceItem()
-      : typed === FormApp.ItemType.PARAGRAPH_TEXT ? item.asParagraphTextItem()
-      : item.asTextItem();
-    response.withItemResponse(casted.createResponse(placeholders[title]));
+    // addTextItem and friends already hand back the typed item, so it carries
+    // createResponse itself. Casting it again is what threw
+    // "item.asTextItem is not a function".
+    response.withItemResponse(items[title].createResponse(placeholders[title]));
   }
 
   Logger.log('FORM (edit it here):   ' + form.getEditUrl());
