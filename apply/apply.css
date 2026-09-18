@@ -3,12 +3,18 @@
    unchanged, so this page cannot drift away from the rest of the site. Only the
    things that page has never needed are below. Mobile first, 375px up. */
 
-/* the open-positions list on the welcome page */
-.ap-open{margin-top:30px;border-top:1px solid var(--n2)}
-.ap-open-g{padding:18px 0 4px;border-bottom:1px solid var(--n2)}
+/* the heading above each group of role cards */
 .ap-open-h{display:flex;align-items:center;gap:10px;color:var(--n5)}
-.ap-open-l{display:flex;flex-wrap:wrap;gap:8px 10px;margin:14px 0 16px}
-.ap-chip{font:600 12px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--p);border:1px solid var(--n2);padding:9px 11px;background:var(--n1)}
+
+/* the mark at the top, the one way back to the site from inside the form */
+.ap-mark{display:inline-block;margin-bottom:18px}
+
+/* The form lives in a fieldset so it can be switched off in one place when no
+   Google Form is connected. A fieldset has a border, padding and a min-width of
+   its own by default, all of which would show; none of that is wanted here. */
+.ap-fs{border:0;margin:0;padding:0;min-width:0}
+.ap-fs[disabled]{opacity:.55}
+.ap-fs[disabled] .ap-card{cursor:not-allowed}
 
 /* the role cards */
 .ap-cards{display:grid;grid-template-columns:1fr;gap:12px;margin-top:16px}

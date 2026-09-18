@@ -29,7 +29,7 @@
   // ─── Positions ─────────────────────────────────────────────────────────────
   // key    : what is stored and sent, and what the flow routes on.
   // title  : the exact wording the applicant and the Google Form both use.
-  // group  : the two headings on the welcome page and the picker.
+  // group  : the two headings the role cards are listed under.
   // sub    : the line under the title on the role questions page.
   // desc   : the one line on the card.
   // qs     : ONLY this role's questions. The flow shows nothing else. There is
@@ -174,7 +174,7 @@
     { id: "name", label: "Full name", ph: "NAME", req: true, kind: "text", placeholder: "Amara Osei" },
     { id: "westernEmail", label: "Western email", ph: "WESTERNEMAIL", req: true, kind: "email", rule: "western", placeholder: "you@uwo.ca", hint: "We reply here first." },
     { id: "personalEmail", label: "Personal email", ph: "PERSONALEMAIL", req: true, kind: "email", rule: "any", placeholder: "you@gmail.com", hint: "In case your Western mail is full or you graduate." },
-    { id: "phone", label: "Phone number", ph: "PHONE", req: false, kind: "text", placeholder: "519 555 0134", hint: "Optional. Only used if we are trying to reach you about an interview." },
+    { id: "phone", label: "Phone number", ph: "PHONE", req: false, kind: "phone", placeholder: "519 555 0134", hint: "Optional. Only used if we are trying to reach you about an interview." },
     { id: "year", label: "Year of study", ph: null, req: true, kind: "select", choices: YEARS },
     { id: "program", label: "Program / faculty", ph: "PROGRAM", req: true, kind: "text", placeholder: "Ivey HBA, Computer Science, Health Sci" },
     { id: "linkedin", label: "LinkedIn", ph: "LINKEDIN", req: false, kind: "url", placeholder: "https://linkedin.com/in/", hint: "Optional." },
@@ -281,6 +281,23 @@
     return null;
   }
 
+  // ─── Phone ─────────────────────────────────────────────────────────────────
+  // Optional, so an empty box is fine. Typed, it has to be a number somebody
+  // could actually dial: a leading + is allowed, and so are the spaces, dashes,
+  // dots and brackets people really type, but nothing else. Ten to fifteen
+  // digits covers a North American number and an international one, and rules
+  // out a birth year typed into the wrong box.
+  function phoneProblem(raw, required) {
+    var value = String(raw || "").trim();
+    if (!value) return required ? "Please enter a phone number." : null;
+    if (/[^0-9+()\-.\s]/.test(value)) return "A phone number can only have digits, spaces, brackets, dashes and a leading +.";
+    if (/\+/.test(value.slice(1))) return "The + belongs at the very start, like +1 519 555 0134.";
+    var digits = value.replace(/\D/g, "");
+    if (digits.length < 10) return "That is too short for a phone number. Please include the area code.";
+    if (digits.length > 15) return "That is too long for a phone number. Please check it.";
+    return null;
+  }
+
   // ─── Checking a step ───────────────────────────────────────────────────────
   // Returns { fieldId: "plain sentence" }. Empty means the step is fine.
   // The SAME function runs in the browser as you type and on the server before
@@ -288,6 +305,7 @@
   function checkField(field, value) {
     var text = String(value || "").trim();
     if (field.kind === "email") return emailProblem(text, field.rule);
+    if (field.kind === "phone") return phoneProblem(text, field.req);
     if (field.kind === "url") return linkProblem(text, field.req);
     if (field.kind === "select") {
       if (!text) return "Please pick one.";
@@ -419,7 +437,8 @@
     ROLE_SLOTS: ROLE_SLOTS, ROLE_FIELD: ROLE_FIELD, FIELDS: FIELDS, REQUIRED: REQUIRED,
     MAX_CHARS: MAX_CHARS,
     roleByKey: roleByKey, roleByTitle: roleByTitle, blank: blank, words: words,
-    emailProblem: emailProblem, linkProblem: linkProblem, checkField: checkField,
+    emailProblem: emailProblem, linkProblem: linkProblem, phoneProblem: phoneProblem,
+    checkField: checkField,
     checkAbout: checkAbout, checkGeneral: checkGeneral, checkRoleChoice: checkRoleChoice,
     checkRoleAnswers: checkRoleAnswers, checkEverything: checkEverything,
     parseForm: parseForm, answersToSend: answersToSend, cleanSubmission: cleanSubmission

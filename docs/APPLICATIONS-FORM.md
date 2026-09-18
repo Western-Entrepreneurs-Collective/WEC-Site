@@ -166,14 +166,14 @@ Form. Nothing else on the page depends on it.
 This is what the applicant sees. The word limits are enforced live as they type
 and again on the server.
 
-### Stage 1, About you — "Let's get to know you."
+### Stage 1, About you — "Let's get to know you." (the page opens here; there is no landing page)
 
 | Question | Type | Required |
 |---|---|---|
 | Full name | short text | yes |
 | Western email | email, must be `@uwo.ca`, `@*.uwo.ca` or `@ivey.ca` | yes |
 | Personal email | email, any | yes |
-| Phone number | short text | no |
+| Phone number | phone, 10 to 15 digits, checked only if filled in | no |
 | Year of study | one of: 1st Year, 2nd Year, 3rd Year, 4th Year, Graduate, Other | yes |
 | Program / faculty | short text | yes |
 | LinkedIn | link | no |
@@ -190,7 +190,7 @@ and again on the server.
 
 ### Stage 3, Position — "Where do you want to build?"
 
-One position only. The twelve options, exactly as they must appear in the Form:
+One position only. Clicking a card goes straight to that role's questions (there is no Continue on this stage). Changing to a different card later asks first if role answers are already written, then clears them. The twelve options, exactly as they must appear in the Form:
 
 **Vice Presidents:** VP Content · VP Communications · VP Community
 

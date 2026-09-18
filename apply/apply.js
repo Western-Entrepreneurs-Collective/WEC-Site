@@ -51,9 +51,11 @@
   }
 
   // ─── The stages ────────────────────────────────────────────────────────────
-  // 0 is the welcome page and is not a stage: the strip only appears once
-  // somebody has started, because a progress bar on a landing page is noise.
-  var WELCOME = 0, ABOUT = 1, GENERAL = 2, POSITION = 3, ROLEQ = 4, REVIEW = 5;
+  // THERE IS NO LANDING PAGE. The page opens on stage 1, About you. The club
+  // will design the applicant-facing landing page itself; until then somebody
+  // who opens /apply/ is already filling the form in, and the only thing above
+  // it is one line saying what they are filling in.
+  var ABOUT = 1, GENERAL = 2, POSITION = 3, ROLEQ = 4, REVIEW = 5;
   var STAGES = [
     { at: ABOUT, t: "About you" },
     { at: GENERAL, t: "General" },
@@ -129,7 +131,7 @@
 
   // ─── The page ──────────────────────────────────────────────────────────────
   function ApplyPage() {
-    var s = React.useState(WELCOME); var step = s[0], setStep = s[1];
+    var s = React.useState(ABOUT); var step = s[0], setStep = s[1];
     var a = React.useState(W.blank()); var v = a[0], setV = a[1];
     var e = React.useState({}); var err = e[0], setErr = e[1];
     var c = React.useState(false); var confirmed = c[0], setConfirmed = c[1];
@@ -188,10 +190,11 @@
       var problems = checkStep(step);
       setErr(problems);
       if (Object.keys(problems).length) { jumpToFirstProblem(); return; }
-      // Came here from an Edit button: go straight back to the review. The one
-      // exception is changing the position, which empties the role answers, so
-      // that has to pass through the new role's questions.
-      if (editing && !(step === POSITION && Object.keys(W.checkRoleAnswers(v)).length)) {
+      // Came here from an Edit button: go straight back to the review. Changing
+      // the position is the one case that cannot come back this way, and it
+      // does not: that stage has no Continue, and picking a different card
+      // sends them through the new role's questions first.
+      if (editing) {
         setEditing(false);
         go(REVIEW);
         return;
@@ -244,76 +247,65 @@
           h("a", { href: "../", className: "btn btn-light" }, h(Sl, { w: 13 }), "Back to the site"))));
     }
 
-    // ── welcome ──
-    if (step === WELCOME) {
-      return h(React.Fragment, null,
-        h("section", { className: "phead" }, h("div", { className: "wrap" },
-          h("div", { className: "eyebrow mono on-p" }, h(Sl, null), "Western Entrepreneurs Collective"),
-          h("h1", { className: "phead-t" }, "We're hiring 🚀"),
-          h("p", { className: "phead-l" }, "WEC Executive Applications, 2026-27. By founders, for founders.")),
-          h("div", { className: "hero-cut" })),
-        h("section", { className: "join" }, h("div", { className: "wrap join-in" },
-          h("p", { className: "lede" }, "WEC is a founder-led entrepreneurship community at Western University, built by students who are actively building themselves."),
-          h("p", { className: "lede" }, "Our founding team has collectively secured $120K+ in grants and investment across our ventures."),
-          h("p", { className: "lede" }, "Now, we're building the team that will take WEC to the next level."),
-
-          h("div", { className: "ap-open" }, W.GROUPS.map(function (g) {
-            return h("div", { className: "ap-open-g", key: g },
-              h("div", { className: "ap-open-h mono" }, h(Sl, null), g === "Vice Presidents" ? "Vice Presidents" : "Directors & Coordinators"),
-              h("div", { className: "ap-open-l" }, W.ROLES.filter(function (r) { return r.group === g; }).map(function (r) {
-                return h("span", { className: "ap-chip", key: r.key }, r.title);
-              })));
-          })),
-
-          h("div", { className: "ap-sec-h" }, h("span", { className: "ap-sec-t" }, "What we're looking for")),
-          h("p", { className: "lede" }, "We're looking for people who want to take ownership, build things, and contribute to something bigger than themselves."),
-          h("p", { className: "lede" }, "You don't need to have everything figured out. You need to be willing to show up, take initiative, and build."),
-          h("p", { className: "lede" }, "Applications are open for one position."),
-
-          open === false ? h("div", { className: "ap-note bad" }, h(Sl, { w: 13, h: 3, style: { marginTop: 7 } }),
-            h("p", null, h("strong", null, "Applications are not open yet."),
-              " This page is live but it is not connected to anything that can receive an application, so nothing typed here would reach us. Check back shortly, or email ",
-              h("strong", null, "hello@wecollective.ca"), ".")) : null,
-
-          h("div", { className: "jactions" },
-            h("button", {
-              className: "btn btn-dark", onClick: function () { go(ABOUT); }, disabled: open !== true
-            }, h(Sl, { w: 13 }), open === null ? "Checking..." : "Start your application"),
-            h("span", { className: "mono jhint" }, "Takes about 25 minutes")),
-
-          h("div", { className: "ap-note" }, h(Sl, { w: 13, h: 3, style: { marginTop: 7 } }),
-            h("p", null, "Your answers are not saved as you go. Finish in one sitting, and keep this tab open. Nothing is stored anywhere until you press Submit on the last page.")))));
-    }
-
     // ── the flow ──
+    // The header is the whole of what used to be the landing page: the mark,
+    // which name of thing this is, and the stage they are on. No hero, no
+    // pitch, no Start button.
     var pct = Math.round((step - 1) / (REVIEW - 1) * 100);
+    // NOT OPEN YET. With no Form connected there is nowhere for an application
+    // to go, so the whole form is put inside a disabled fieldset: every input,
+    // select, textarea, role card and button inside it stops responding, and
+    // the browser will not let a disabled control be typed in or pressed. The
+    // stages still render, so somebody can read what is being asked, but
+    // nothing can be filled in and nothing can be submitted.
+    var usable = open === true;
     return h(React.Fragment, null,
       h("section", { className: "phead" }, h("div", { className: "wrap" },
-        h("a", { href: "../", "aria-label": "Home" }, h(Mark, { tone: "light", height: 22 })),
+        h("a", { href: "../", "aria-label": "Western Entrepreneurs Collective, home", className: "ap-mark" },
+          h(Mark, { tone: "light", height: 22 })),
+        h("div", { className: "eyebrow mono on-p" }, h(Sl, null), "WEC Executive Applications 2026-27"),
         h("h1", { className: "phead-t" }, titleFor(step, role)),
         h("p", { className: "phead-l" }, subtitleFor(step, role))),
         h("div", { className: "hero-cut" })),
       h("section", { className: "join" }, h("div", { className: "wrap join-in" },
         h(Honeypot, { value: website, onChange: function (ev) { setWebsite(ev.target.value); } }),
+
+        open === false ? h("div", { className: "ap-note bad", role: "status" }, h(Sl, { w: 13, h: 3, style: { marginTop: 7 } }),
+          h("p", null, h("strong", null, "Applications are not open yet."),
+            " This page is live but it is not connected to anything that can receive an application, so nothing typed here would reach us. The questions below are shown so you know what to expect, and they cannot be filled in yet. Check back shortly, or email ",
+            h("strong", null, "hello@wecollective.ca"), ".")) : null,
+        open === null ? h("div", { className: "ap-note", role: "status" }, h(Sl, { w: 13, h: 3, style: { marginTop: 7 } }),
+          h("p", null, "Checking whether applications are open...")) : null,
+
         h(Steps, { step: step, roleKey: v.roleKey, go: go }),
         h("div", { className: "jprog" }, h("div", { className: "jprog-fill", style: { width: pct + "%" } })),
         h("div", { className: "jprog-lab mono" }, "Stage " + step + " of " + REVIEW),
 
-        step === ABOUT ? aboutStep() :
-          step === GENERAL ? generalStep() :
-            step === POSITION ? positionStep() :
-              step === ROLEQ ? roleQuestions() : reviewStep(),
+        h("fieldset", { className: "ap-fs", disabled: !usable },
+          step === ABOUT ? aboutStep() :
+            step === GENERAL ? generalStep() :
+              step === POSITION ? positionStep() :
+                step === ROLEQ ? roleQuestions() : reviewStep(),
 
-        h("div", { className: "jactions" },
-          step < REVIEW
-            ? h("button", { className: "btn btn-dark", onClick: next }, h(Sl, { w: 13 }),
-              editing ? "Back to review" : step === ROLEQ ? "Review application" : "Continue")
-            : h("button", { className: "btn btn-dark", onClick: submit, disabled: status === "sending" },
-              h(Sl, { w: 13 }), status === "sending" ? "Sending..." : "Submit application"),
-          h("button", { className: "btn btn-ghost", onClick: back }, "Back"),
-          h("span", { className: "mono jhint" }, Object.keys(err).length
-            ? Object.keys(err).length + (Object.keys(err).length === 1 ? " answer needs fixing" : " answers need fixing")
-            : "Nothing is sent until you submit")))));
+          h("div", { className: "jactions" },
+            // The position stage has no Continue: picking a card IS the
+            // continue. Every other stage keeps one.
+            step === POSITION ? null
+              : step < REVIEW
+                ? h("button", { className: "btn btn-dark", onClick: next }, h(Sl, { w: 13 }),
+                  editing ? "Back to review" : step === ROLEQ ? "Review application" : "Continue")
+                : h("button", { className: "btn btn-dark", onClick: submit, disabled: status === "sending" },
+                  h(Sl, { w: 13 }), status === "sending" ? "Sending..." : "Submit application"),
+            // Stage 1 is the first thing on the page, so there is nothing to go
+            // back to. The mark at the top is the way back to the site.
+            step > ABOUT ? h("button", { className: "btn btn-ghost", onClick: back }, "Back") : null,
+            h("span", { className: "mono jhint" }, Object.keys(err).length
+              ? Object.keys(err).length + (Object.keys(err).length === 1 ? " answer needs fixing" : " answers need fixing")
+              : step === POSITION ? "Pick a position to carry on"
+                : "Nothing is sent until you submit"))),
+
+        step === ABOUT ? h("div", { className: "ap-note" }, h(Sl, { w: 13, h: 3, style: { marginTop: 7 } }),
+          h("p", null, "Your answers are not saved as you go. Finish in one sitting, and keep this tab open. Nothing is stored anywhere until you press Submit on the last page.")) : null)));
 
     // ── stage 1 ──
     function aboutStep() {
@@ -350,6 +342,42 @@
     }
 
     // ── stage 3 ──
+    // Picking a card goes straight to that role's questions. There is no
+    // Continue button here, because a card is a choice and a choice is the only
+    // thing this stage asks for.
+    function pickRole(r) {
+      var already = v.roleKey === r.key;
+      if (!already && anyRoleAnswerTyped()) {
+        // Only ever asked when there is something real to lose. Changing role
+        // MUST clear the old role's answers: r2 of one role is a different
+        // question from r2 of another, and carrying the text across would
+        // silently put an answer to a question the applicant never read into
+        // the club's Sheet.
+        var was = W.roleByKey(v.roleKey);
+        var ok = window.confirm("You have already written answers for " + (was ? was.title : "the other position")
+          + ". Switching to " + r.title + " will delete them, because the questions are different. Switch anyway?");
+        if (!ok) return;
+      }
+      var nv = Object.assign({}, v, { roleKey: r.key });
+      if (!already) W.ROLE_SLOTS.forEach(function (slot) { nv[slot.id] = ""; });
+      setV(nv);
+      var ne = Object.assign({}, err);
+      delete ne.role;
+      // The old role's error messages belong to questions that are gone.
+      if (!already) W.ROLE_SLOTS.forEach(function (slot) { delete ne[slot.id]; });
+      setErr(ne);
+      // Came from an Edit button on the review page and did not actually change
+      // anything: there is nothing to answer again, so go back to the review.
+      if (already && editing) { setEditing(false); return go(REVIEW); }
+      go(ROLEQ);
+    }
+
+    function anyRoleAnswerTyped() {
+      var typed = false;
+      W.ROLE_SLOTS.forEach(function (slot) { if (String(v[slot.id] || "").trim()) typed = true; });
+      return typed;
+    }
+
     function positionStep() {
       return h("div", null,
         err.role ? h("div", { className: "ap-err-top", role: "alert" }, err.role) : null,
@@ -360,17 +388,7 @@
               var on = v.roleKey === r.key;
               return h("button", {
                 key: r.key, className: "ap-card" + (on ? " on" : ""), "aria-pressed": on ? "true" : "false",
-                onClick: function () {
-                  // Changing role keeps everything already written. The answers
-                  // for the old role's slots are cleared, because r2 of one role
-                  // is a different question from r2 of another and carrying the
-                  // text over would silently submit an answer to a question the
-                  // applicant never read.
-                  var nv = Object.assign({}, v, { roleKey: r.key });
-                  if (v.roleKey !== r.key) W.ROLE_SLOTS.forEach(function (slot) { nv[slot.id] = ""; });
-                  setV(nv);
-                  if (err.role) { var ne = Object.assign({}, err); delete ne.role; setErr(ne); }
-                }
+                onClick: function () { pickRole(r); }
               },
                 on ? h("span", { className: "ap-card-n" }, "Selected") : null,
                 h("span", { className: "ap-card-t" }, r.title),

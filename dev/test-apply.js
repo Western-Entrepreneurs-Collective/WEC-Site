@@ -18,6 +18,10 @@
  *   8  with no setting, nothing is accepted and the page is told applications
  *      are not open
  *   9  the setup check reads the Form and says in plain words what is wrong
+ *  10  every required field, emptied on its own, is refused server side
+ *  11  every email, phone, link and year rule is checked server side
+ *  12  every paragraph is required and its word limit holds both ways
+ *  13  one role's answers never carry into another role's submission
  */
 "use strict";
 
@@ -222,6 +226,140 @@ async function main() {
     var signin = await get();
     assert.ok(signin.body.problems.some(function (p) { return /sign in to Google/.test(p); }));
     google.mode = "ok";
+  });
+
+  // ── The server side of the validation. The browser checks the same rules out
+  // of the same file, but the browser is never the only guard: every one of
+  // these posts goes straight at api/apply.js, with no page involved at all.
+
+  await test("10  every required field, emptied on its own, is refused with its own sentence", async function () {
+    connect(); google.mode = "ok"; google.received = [];
+    // Each of these is emptied by itself in an otherwise perfect application,
+    // so a pass here cannot come from some other field failing.
+    var required = ["name", "westernEmail", "personalEmail", "year", "program", "resume", "intro", "g1", "g2"];
+    for (var i = 0; i < required.length; i++) {
+      var id = required[i];
+      var v = application("director-admin");
+      v[id] = "";
+      var out = await post(v);
+      assert.strictEqual(out.status, 400, id + " empty should be refused");
+      assert.strictEqual(out.body.error, "invalid", id + " should be an invalid application, not junk");
+      assert.ok(out.body.errors[id], "there should be a message for " + id + ": " + JSON.stringify(out.body.errors));
+      assert.ok(/[a-z]/.test(out.body.errors[id]) && /\.$/.test(out.body.errors[id].trim()),
+        id + "'s message should be a plain sentence: " + out.body.errors[id]);
+    }
+    // And a missing role choice, which is not one of the fields above.
+    var noRole = application("director-admin");
+    noRole.roleKey = "";
+    assert.strictEqual((await post(noRole)).status, 400, "no position chosen must be refused");
+    assert.strictEqual(google.received.length, 0, "nothing reaches Google while anything is missing");
+  });
+
+  await test("11  every rule is checked on the server: emails, phone, links, the year list", async function () {
+    connect(); google.mode = "ok"; google.received = [];
+    var cases = [
+      ["westernEmail", "amara@gmail.com", /Western email/],
+      ["westernEmail", "amara@uwo.com", /Did you mean @uwo\.ca/],
+      ["westernEmail", "amara at uwo.ca", /space in it|needs one @/],
+      ["westernEmail", "amara@uwo", /looks incomplete/],
+      ["personalEmail", "not-an-email", /needs one @/],
+      ["personalEmail", "amara@gmial.com", /Did you mean @gmail\.com/],
+      ["phone", "call me maybe", /digits, spaces/],
+      ["phone", "5195", /too short/],
+      ["phone", "5195550134555550134", /too long/],
+      ["phone", "519 555+0134", /\+ belongs at the very start/],
+      ["resume", "drive.google.com/file/d/abc", /start the link with https/],
+      ["resume", "https://drive", /complete link/],
+      ["linkedin", "linkedin.com/in/amara", /start the link with https/],
+      ["portfolio", "ftp://amara.build", /start the link with https/],
+      ["year", "Fifth Year", /pick one of the options/]
+    ];
+    for (var i = 0; i < cases.length; i++) {
+      var id = cases[i][0], value = cases[i][1], wanted = cases[i][2];
+      var v = application("outreach");
+      v[id] = value;
+      var out = await post(v);
+      assert.strictEqual(out.status, 400, id + " = " + JSON.stringify(value) + " should be refused");
+      assert.ok(wanted.test(out.body.errors[id] || ""),
+        id + " = " + JSON.stringify(value) + " should say " + wanted + ", said: " + JSON.stringify(out.body.errors[id]));
+    }
+    // The optional fields, left empty, are fine. Optional does not mean
+    // unchecked; it means unchecked only when it is empty.
+    var fine = application("outreach");
+    fine.phone = ""; fine.linkedin = ""; fine.portfolio = "";
+    assert.deepStrictEqual((await post(fine)).body, { ok: true }, "empty optional fields are not an error");
+    assert.strictEqual(google.received.length, 1, "and that one application does reach Google");
+  });
+
+  await test("12  every paragraph answer is required and its word limit is enforced both ways", async function () {
+    connect(); google.mode = "ok"; google.received = [];
+    // Walked from the schema, so a question added later is covered without
+    // anybody remembering to add a test for it.
+    var roleKey = "vp-content";
+    var role = WEC.roleByKey(roleKey);
+    var paragraphs = WEC.ABOUT.filter(function (f) { return f.kind === "long"; })
+      .concat(WEC.GENERAL)
+      .concat(role.qs.map(function (q) { return { id: q.id, max: q.max }; }));
+    assert.ok(paragraphs.length >= 7, "there should be paragraphs from all three stages, got " + paragraphs.length);
+    for (var i = 0; i < paragraphs.length; i++) {
+      var p = paragraphs[i];
+      var empty = application(roleKey);
+      empty[p.id] = "   ";
+      var out1 = await post(empty);
+      assert.strictEqual(out1.status, 400, p.id + " empty should be refused");
+      assert.ok(out1.body.errors[p.id], p.id + " empty should have a message");
+
+      var over = application(roleKey);
+      over[p.id] = words(p.max + 1);
+      var out2 = await post(over);
+      assert.strictEqual(out2.status, 400, p.id + " one word over its limit should be refused");
+      assert.ok(new RegExp("limit is " + p.max).test(out2.body.errors[p.id] || ""),
+        p.id + " should name its own limit of " + p.max + ", said: " + JSON.stringify(out2.body.errors[p.id]));
+
+      // Exactly on the limit is allowed: the limit is a limit, not a fence.
+      var edge = application(roleKey);
+      edge[p.id] = words(p.max);
+      assert.deepStrictEqual((await post(edge)).body, { ok: true }, p.id + " exactly at " + p.max + " words should be accepted");
+    }
+    assert.strictEqual(google.received.length, paragraphs.length, "only the valid ones reached Google");
+  });
+
+  await test("13  one role's answers never carry into another role's submission", async function () {
+    connect(); google.mode = "ok"; google.received = [];
+    var E = fake.ENTRY;
+    // Somebody filled in VP Content, went back, and chose Director of Admin.
+    // The page clears the old answers; this proves the server does not send
+    // them even if a browser or a script kept them.
+    var vp = application("vp-content");
+    var swapped = application("director-admin");
+    swapped.r4 = vp.r4;                    // Director of Admin has no fourth question
+    swapped.rlink = "https://old.example"; // and no link question either
+    var out = await post(swapped);
+    assert.deepStrictEqual(out.body, { ok: true });
+    var got = google.received[0];
+    assert.strictEqual(got[E.r4], undefined, "a leftover fourth answer must not be sent");
+    assert.strictEqual(got[E.rlink], undefined, "a leftover link must not be sent");
+    assert.strictEqual(got[E.role], "Director of Admin");
+    assert.ok(got[E.r2].indexOf("15 action items") > -1, "the answers sent are Director of Admin's own questions");
+
+    // And the other direction: keeping the old role's ANSWER TEXT but choosing
+    // the new role means the text is submitted under the NEW question, which is
+    // exactly why the page clears it. The server can only guarantee the
+    // question text matches the role that was chosen, and it does.
+    google.received = [];
+    var mismatched = application("director-admin");
+    mismatched.r2 = "This was written for the VP Content question about creative freedom.";
+    await post(mismatched);
+    var line = google.received[0][E.r2];
+    assert.ok(line.indexOf("15 action items") === 0 || line.indexOf("Imagine an exec meeting") > -1,
+      "the question text above the answer is always the chosen role's: " + line.slice(0, 60));
+
+    // A role that does not exist is still refused, even with perfect answers.
+    google.received = [];
+    var fake2 = application("vp-content");
+    fake2.roleKey = "vp-vibes";
+    assert.strictEqual((await post(fake2)).status, 400);
+    assert.strictEqual(google.received.length, 0);
   });
 
   console.log("\n" + passed + " passed, " + failed + " failed\n");
