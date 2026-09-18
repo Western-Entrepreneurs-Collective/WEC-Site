@@ -1,4 +1,7 @@
 const COPY = window.WEC_COPY;
+// The executive applications page. A placeholder path: the club picks the final one.
+// Change it here and rename the exec-applications/ folder to match (docs/APPLICATIONS-FORM.md).
+const EXEC_APPLICATIONS_PATH = "/exec-applications/";
 function Sl({ w = 15, h = 3, style }) {
   return /* @__PURE__ */ React.createElement("span", { className: "sl", style: { width: w, height: h, ...style } });
 }
@@ -154,7 +157,15 @@ function Close({ go }) {
   return /* @__PURE__ */ React.createElement("section", { className: "close rv", id: "join" }, /* @__PURE__ */ React.createElement("div", { className: "wrap" }, /* @__PURE__ */ React.createElement(Sl, { w: 64, h: 12, style: { display: "block" } }), /* @__PURE__ */ React.createElement("h2", { className: "close-t" }, "Seventy five places. Sixty three gone."), /* @__PURE__ */ React.createElement("div", { className: "hero-actions" }, /* @__PURE__ */ React.createElement("a", { href: "#/join", onClick: (e) => {
     e.preventDefault();
     go("/join");
-  }, className: "btn btn-light" }, /* @__PURE__ */ React.createElement(Sl, { w: 13 }), COPY.cta)), /* @__PURE__ */ React.createElement("p", { className: "note note-lt" }, COPY.note)));
+  }, className: "btn btn-light" }, /* @__PURE__ */ React.createElement(Sl, { w: 13 }), COPY.cta), /* @__PURE__ */ React.createElement(
+    "a",
+    {
+      href: EXEC_APPLICATIONS_PATH,
+      className: "btn btn-out"
+    },
+    /* @__PURE__ */ React.createElement(Sl, { w: 13 }),
+    "Exec team applications"
+  )), /* @__PURE__ */ React.createElement("p", { className: "note note-lt" }, COPY.note), /* @__PURE__ */ React.createElement("p", { className: "note note-lt" }, "Joining the cohort and helping run WEC are two different things. Applications for the ", /* @__PURE__ */ React.createElement("a", { href: EXEC_APPLICATIONS_PATH, style: { color: "inherit", textDecoration: "underline", fontWeight: 600 } }, "2026-27 executive team"), " are separate, and take about twenty five minutes.")));
 }
 function HomePage({ go }) {
   return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Hero, { go }), /* @__PURE__ */ React.createElement("div", { className: "hero-cut" }), /* @__PURE__ */ React.createElement(Marquee, null), /* @__PURE__ */ React.createElement(Principles, null), /* @__PURE__ */ React.createElement(Scrubber, null), /* @__PURE__ */ React.createElement(Close, { go }));
@@ -178,6 +189,42 @@ Object.assign(window, { ProgramPage });
 const BLANK = { name: "", email: "", year: "Year 1", building: "", evidence: "", link: "", hard: "" };
 function Field({ label, hint, error, children, req }) {
   return /* @__PURE__ */ React.createElement("label", { className: "fld" }, /* @__PURE__ */ React.createElement("span", { className: "fld-l mono" }, label, req ? /* @__PURE__ */ React.createElement("span", { className: "req" }, " *") : null), children, error ? /* @__PURE__ */ React.createElement("span", { className: "fld-e mono" }, error) : /* @__PURE__ */ React.createElement("span", { className: "fld-h" }, hint));
+}
+// THE FORM SUBMITTED NOWHERE UNTIL 2026-09-12. It collected five required answers,
+// then ran setDone(true) and showed the applicant "You are in the pile." and a row
+// reading "Submitted / Just now". Nothing was sent. No fetch, no form action, no
+// mailto. The answers died in React state on page unload, and every student who
+// used it was told they had applied.
+//
+// mailto is not a good form. It is the only delivery this site can honestly make:
+// there is no backend, the club has no owner for one, and a Google Form needs an
+// account nobody has stood up yet. It hands the answers to the applicant's own mail
+// client so THEY press send, which is why the copy below stops claiming we received
+// anything and tells them what still has to happen.
+function applicationMailto(v) {
+  const lines = [
+    "Name: " + v.name,
+    "Western email: " + v.email,
+    "Year: " + v.year,
+    "",
+    "What are you building?",
+    v.building,
+    "",
+    "What have you shipped?",
+    v.evidence,
+    "",
+    "Link:",
+    v.link,
+    "",
+    "Hardest part:",
+    v.hard || "Not answered"
+  ];
+  // The address is NOT percent-encoded. encodeURIComponent turns "@" into "%40" and
+  // some mail clients will not parse mailto:hello%40wecollective.ca as a recipient.
+  // Only the subject and body are encoded, which is where arbitrary text can appear.
+  return "mailto:" + COPY.email +
+    "?subject=" + encodeURIComponent("Founding member application, " + v.name) +
+    "&body=" + encodeURIComponent(lines.join("\n"));
 }
 function JoinPage({ go }) {
   const [step, setStep] = React.useState(0);
@@ -209,7 +256,7 @@ function JoinPage({ go }) {
   const filled = [v.name, v.email, v.building, v.evidence, v.link].filter((x) => x.trim()).length;
   const pct = Math.round(filled / 5 * 100);
   if (done) {
-    return /* @__PURE__ */ React.createElement("section", { className: "done" }, /* @__PURE__ */ React.createElement("div", { className: "wrap done-in" }, /* @__PURE__ */ React.createElement(Sl, { w: 64, h: 12, style: { display: "block" } }), /* @__PURE__ */ React.createElement("h1", { className: "done-t" }, "You are in the pile."), /* @__PURE__ */ React.createElement("p", { className: "done-p" }, "We read applications in the order they arrive and reply to everyone. Expect an answer within a week at ", /* @__PURE__ */ React.createElement("strong", null, v.email || COPY.email), "."), /* @__PURE__ */ React.createElement("div", { className: "done-rows" }, [["Submitted", "Just now"], ["Decisions", "Rolling, within a week"], ["First session", "Inaugural dinner, October"], ["Places left", COPY.places.total - COPY.places.taken - 1 + " of " + COPY.places.total]].map(([k, t]) => /* @__PURE__ */ React.createElement("div", { className: "done-row", key: k }, /* @__PURE__ */ React.createElement("span", null, k), /* @__PURE__ */ React.createElement("span", { className: "mono" }, t)))), /* @__PURE__ */ React.createElement("div", { className: "hero-actions" }, /* @__PURE__ */ React.createElement("a", { href: "#/program", onClick: (e) => {
+    return /* @__PURE__ */ React.createElement("section", { className: "done" }, /* @__PURE__ */ React.createElement("div", { className: "wrap done-in" }, /* @__PURE__ */ React.createElement(Sl, { w: 64, h: 12, style: { display: "block" } }), /* @__PURE__ */ React.createElement("h1", { className: "done-t" }, "One more step."), /* @__PURE__ */ React.createElement("p", { className: "done-p" }, "Your email app should have opened with your answers already written out. ", /* @__PURE__ */ React.createElement("strong", null, "Press send in that email to finish your application."), " Nothing reaches us until you do. If nothing opened, ", /* @__PURE__ */ React.createElement("a", { href: applicationMailto(v), style: { color: "inherit", textDecoration: "underline", fontWeight: 600 } }, "open it here"), " or email your answers to ", /* @__PURE__ */ React.createElement("strong", null, COPY.email), ". We read applications in the order they arrive and reply to everyone within a week."), /* @__PURE__ */ React.createElement("div", { className: "done-rows" }, [["Send the email", "Not done until you press send"], ["Decisions", "Rolling, within a week"], ["First session", "Inaugural dinner, October"]].map(([k, t]) => /* @__PURE__ */ React.createElement("div", { className: "done-row", key: k }, /* @__PURE__ */ React.createElement("span", null, k), /* @__PURE__ */ React.createElement("span", { className: "mono" }, t)))), /* @__PURE__ */ React.createElement("div", { className: "hero-actions" }, /* @__PURE__ */ React.createElement("a", { href: "#/program", onClick: (e) => {
       e.preventDefault();
       go("/program");
     }, className: "btn btn-light" }, /* @__PURE__ */ React.createElement(Sl, { w: 13 }), "Read what happens next"))));
@@ -227,6 +274,7 @@ function JoinPage({ go }) {
     /* @__PURE__ */ React.createElement("span", { className: "jstep-n mono" }, "0", i + 1),
     /* @__PURE__ */ React.createElement("span", { className: "jstep-t" }, s)
   ))), /* @__PURE__ */ React.createElement("div", { className: "jprog" }, /* @__PURE__ */ React.createElement("div", { className: "jprog-fill", style: { width: pct + "%" } })), /* @__PURE__ */ React.createElement("div", { className: "jprog-lab mono" }, pct, "% complete"), step === 0 ? /* @__PURE__ */ React.createElement("div", { className: "jgrid" }, /* @__PURE__ */ React.createElement(Field, { label: "Full name", req: true, error: err.name, hint: "As it appears on your student record." }, /* @__PURE__ */ React.createElement("input", { className: "inp" + (err.name ? " bad" : ""), value: v.name, onChange: set("name"), placeholder: "Amara Osei" })), /* @__PURE__ */ React.createElement(Field, { label: "Western email", req: true, error: err.email, hint: "Used to verify enrolment. Nothing else." }, /* @__PURE__ */ React.createElement("input", { className: "inp" + (err.email ? " bad" : ""), value: v.email, onChange: set("email"), placeholder: "you@uwo.ca" })), /* @__PURE__ */ React.createElement(Field, { label: "Year", hint: "First years are welcome if you are building." }, /* @__PURE__ */ React.createElement("select", { className: "inp", value: v.year, onChange: set("year") }, ["Year 1", "Year 2", "Year 3", "Year 4", "Graduate"].map((y) => /* @__PURE__ */ React.createElement("option", { key: y }, y))))) : step === 1 ? /* @__PURE__ */ React.createElement("div", { className: "jcol" }, /* @__PURE__ */ React.createElement(Field, { label: COPY.questions[0].label, req: true, error: err.building, hint: COPY.questions[0].hint }, /* @__PURE__ */ React.createElement("input", { className: "inp" + (err.building ? " bad" : ""), value: v.building, onChange: set("building"), placeholder: COPY.questions[0].ph })), /* @__PURE__ */ React.createElement(Field, { label: COPY.questions[1].label, req: true, error: err.evidence, hint: COPY.questions[1].hint }, /* @__PURE__ */ React.createElement("textarea", { rows: 4, className: "inp ta" + (err.evidence ? " bad" : ""), value: v.evidence, onChange: set("evidence"), placeholder: COPY.questions[1].ph })), /* @__PURE__ */ React.createElement(Field, { label: COPY.questions[2].label, req: true, error: err.link, hint: COPY.questions[2].hint }, /* @__PURE__ */ React.createElement("input", { className: "inp" + (err.link ? " bad" : ""), value: v.link, onChange: set("link"), placeholder: COPY.questions[2].ph })), /* @__PURE__ */ React.createElement(Field, { label: COPY.questions[3].label, hint: COPY.questions[3].hint }, /* @__PURE__ */ React.createElement("textarea", { rows: 3, className: "inp ta", value: v.hard, onChange: set("hard") }))) : /* @__PURE__ */ React.createElement("div", { className: "jrev" }, [["Name", v.name], ["Email", v.email], ["Year", v.year], ["Building", v.building], ["Shipped", v.evidence], ["Link", v.link], ["Hardest part", v.hard || "Not answered"]].map(([k, val]) => /* @__PURE__ */ React.createElement("div", { className: "jrev-row", key: k }, /* @__PURE__ */ React.createElement("span", { className: "jrev-k mono" }, k), /* @__PURE__ */ React.createElement("span", { className: "jrev-v" }, val))), /* @__PURE__ */ React.createElement("div", { className: "jnote" }, /* @__PURE__ */ React.createElement(Sl, { w: 13, h: 3, style: { marginTop: 7 } }), /* @__PURE__ */ React.createElement("p", null, "Nothing here is shared outside the reading group. If you are not taken this term you can apply again in January."))), /* @__PURE__ */ React.createElement("div", { className: "jactions" }, step < 2 ? /* @__PURE__ */ React.createElement("button", { className: "btn btn-dark", onClick: next }, /* @__PURE__ */ React.createElement(Sl, { w: 13 }), "Continue") : /* @__PURE__ */ React.createElement("button", { className: "btn btn-dark", onClick: () => {
+    window.location.href = applicationMailto(v);
     setDone(true);
     window.scrollTo(0, 0);
   } }, /* @__PURE__ */ React.createElement(Sl, { w: 13 }), "Submit application"), step > 0 ? /* @__PURE__ */ React.createElement("button", { className: "btn btn-ghost", onClick: () => setStep(step - 1) }, "Back") : null, /* @__PURE__ */ React.createElement("span", { className: "mono jhint" }, "Step ", step + 1, " of 3")))));

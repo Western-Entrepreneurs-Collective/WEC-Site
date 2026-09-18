@@ -1,0 +1,71 @@
+/* Executive applications. Everything here sits ON TOP of ../launch.css: the
+   tokens, the buttons, .fld, .inp, .jstep, .jrev and .done all come from there
+   unchanged, so this page cannot drift away from the rest of the site. Only the
+   things that page has never needed are below. Mobile first, 375px up. */
+
+/* the heading above each group of role cards */
+.ap-open-h{display:flex;align-items:center;gap:10px;color:var(--n5)}
+
+/* the mark at the top, the one way back to the site from inside the form */
+.ap-mark{display:inline-block;margin-bottom:18px}
+
+/* The form lives in a fieldset so it can be switched off in one place when no
+   Google Form is connected. A fieldset has a border, padding and a min-width of
+   its own by default, all of which would show; none of that is wanted here. */
+.ap-fs{border:0;margin:0;padding:0;min-width:0}
+.ap-fs[disabled]{opacity:.55}
+.ap-fs[disabled] .ap-card{cursor:not-allowed}
+
+/* the role cards */
+.ap-cards{display:grid;grid-template-columns:1fr;gap:12px;margin-top:16px}
+@media(min-width:680px){.ap-cards{grid-template-columns:1fr 1fr}}
+.ap-card{position:relative;text-align:left;background:var(--bg);border:1px solid var(--n2);padding:18px 17px;cursor:pointer;display:block;font:inherit;color:inherit;transition:border-color .14s cubic-bezier(.2,0,.2,1),background .14s}
+.ap-card:hover{border-color:var(--p)}
+.ap-card::before{content:"";position:absolute;left:-1px;top:-1px;bottom:-1px;width:0;background:var(--g);transition:width .2s cubic-bezier(.2,0,.2,1)}
+.ap-card.on{border-color:var(--p);background:#F7F4FB}
+.ap-card.on::before{width:5px}
+.ap-card-t{font:700 18px/1.25 var(--sans);letter-spacing:-.02em;display:block;padding-right:70px}
+.ap-card-d{font:400 14px/1.55 var(--sans);color:var(--n7);display:block;margin-top:7px}
+.ap-card-n{position:absolute;top:18px;right:17px;font:600 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--g)}
+.ap-group{margin-top:28px}
+.ap-group:first-of-type{margin-top:22px}
+
+/* the progress strip: same .jstep look, but it scrolls sideways on a phone
+   because there are five stages and the fourth one carries a role name */
+.ap-steps{display:flex;border-top:1px solid var(--n2);border-bottom:1px solid var(--n2);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.ap-steps::-webkit-scrollbar{display:none}
+.ap-step{flex:1 0 auto;min-width:112px;display:flex;flex-direction:column;gap:5px;background:transparent;border:0;border-left:1px solid var(--n2);padding:13px 13px;cursor:pointer;text-align:left}
+.ap-step:first-child{border-left:0}
+.ap-step:disabled{cursor:default}
+.ap-step.on{background:#F4F0F9}
+.ap-step-t{font:600 13px/1.15 var(--sans);color:var(--n5)}
+.ap-step.on .ap-step-t,.ap-step.past .ap-step-t{color:var(--ink)}
+.ap-step-r{font:500 10px/1.2 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--g);max-width:15ch}
+
+/* questions */
+.ap-q{display:flex;flex-direction:column;gap:9px}
+.ap-q-l{font:600 16px/1.45 var(--sans);letter-spacing:-.01em}
+.ap-q-h{font:400 13px/1.5 var(--sans);color:var(--n4)}
+.ap-count{display:flex;justify-content:space-between;gap:12px;align-items:baseline}
+.ap-words{font:500 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--n4);white-space:nowrap}
+.ap-words.over{color:#7A1F3D}
+.ap-sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:14px;margin-top:34px;padding-bottom:9px;border-bottom:2px solid var(--ink)}
+.ap-sec-h:first-child{margin-top:0}
+.ap-sec-t{font:600 13px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase}
+.ap-edit{background:transparent;border:0;padding:4px 0;cursor:pointer;font:600 12px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--p);border-bottom:2px solid var(--g)}
+.ap-edit:hover{color:var(--ink)}
+.ap-rev-v{white-space:pre-wrap}
+
+/* the confirm line and the notices */
+.ap-confirm{display:flex;gap:12px;align-items:flex-start;margin-top:26px;padding:17px;border:1px solid var(--n2);background:var(--n1);cursor:pointer}
+.ap-confirm input{width:20px;height:20px;flex:none;margin:1px 0 0;accent-color:var(--p)}
+.ap-confirm span{font:400 15px/1.5 var(--sans)}
+.ap-note{display:flex;gap:13px;align-items:flex-start;margin-top:22px;padding:16px 17px;border:1px solid var(--n2);background:var(--n1)}
+.ap-note p{font:400 14px/1.6 var(--sans);color:var(--n7);max-width:56ch}
+.ap-note strong{font-weight:600;color:var(--ink)}
+.ap-note.bad{border-color:#7A1F3D;background:#FBF3F5}
+.ap-err-top{margin-top:22px;padding:14px 16px;border:1px solid #7A1F3D;background:#FBF3F5;font:400 14px/1.6 var(--sans);color:#7A1F3D}
+
+/* touch targets stay 44px plus on a phone, and the buttons stack rather than
+   squeezing to two words a line at 375px */
+@media(max-width:479px){.jactions .btn{width:100%}.jactions .jhint{margin-left:0}}
