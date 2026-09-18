@@ -46,6 +46,7 @@ function start(options) {
   var server = http.createServer(function (req, res) {
     var url = new URL(req.url, "http://" + req.headers.host);
     if (req.method === "GET" && url.pathname === "/forms/d/e/" + FORM_ID + "/viewform") {
+      server.views++;
       if (server.mode === "signin") {
         res.statusCode = 302;
         res.setHeader("Location", "https://accounts.google.com/signin");
@@ -83,10 +84,11 @@ function start(options) {
   });
   server.mode = "ok";
   server.received = [];
+  server.views = 0;   // how many times the public Form page was fetched
   return server;
 }
 
-var WEC = require("../apply-schema.js");
+var WEC = require("../exec-applications-schema.js");
 
 /** The question list a correctly built Form would have, straight off the schema. */
 function questions() {

@@ -1,10 +1,18 @@
 /**
- * POST /api/apply : takes an executive application and submits it to the club's
- *                   Google Form, which writes it into the Form's linked Sheet.
- * GET  /api/apply : a setup check. Says in plain words whether the Form is
- *                   connected and what, if anything, will make Google refuse an
- *                   application. The apply page calls it on load to decide
- *                   whether to open at all.
+ * POST /api/exec-applications : takes an executive application and submits it
+ *     to the club's Google Form, which writes it into the Form's linked Sheet.
+ * GET  /api/exec-applications : answers { connected, ready } and nothing else.
+ *     The exec applications page calls it on load and opens only when both are
+ *     true. The answer is cached for five minutes per function instance, so a
+ *     page view is not a Google fetch.
+ * GET  /api/exec-applications?detail=1&key=<WEC_SETUP_CHECK_KEY>
+ *     the setup check for whoever runs the Form: the same answer plus a
+ *     plain-words list of problems, read fresh from Google. It needs the key.
+ *     With WEC_SETUP_CHECK_KEY unset it works without one everywhere EXCEPT
+ *     production (VERCEL_ENV=production), where it is then refused.
+ *
+ * THE PATH IS A PLACEHOLDER. On Vercel this file's name IS the URL. To move it,
+ * see "Choosing the final URL" in docs/APPLICATIONS-FORM.md.
  *
  * WHY THE SERVER SENDS IT, NOT THE BROWSER
  *
@@ -23,21 +31,32 @@
  */
 "use strict";
 
-var WEC = require("../apply-schema.js");
+var crypto = require("crypto");
+var WEC = require("../exec-applications-schema.js");
 
-// Only Google may receive an application. WEC_GOOGLE_FORM_TEST_HOST is server
-// only and exists so the whole path can be tested against a local stand-in for
-// Google. It is never read in the browser and never sent to one.
+var LOG = "[exec-applications]";
+var CHECK_TTL_MS = 5 * 60 * 1000;        // the public Form check is reused for 5 minutes
+var RATE_LIMIT = 5;                      // submissions allowed per IP ...
+var RATE_WINDOW_MS = 10 * 60 * 1000;     // ... per 10 minutes
+var HONEYPOT = "wec_hp";                 // the hidden field's name, shared with the page
+
+function isProduction() { return process.env.VERCEL_ENV === "production"; }
+
+// Only Google, over https, may receive an application. WEC_GOOGLE_FORM_TEST_HOST
+// is server only and exists so the whole path can be tested against a local
+// stand-in for Google (plain http, on this machine). It is IGNORED in
+// production, so a stray value there can never send applications anywhere else.
 function allowedHost(action) {
-  var host = new URL(action).host;
-  return host === "docs.google.com" ||
-    (!!process.env.WEC_GOOGLE_FORM_TEST_HOST && host === process.env.WEC_GOOGLE_FORM_TEST_HOST);
+  var url = new URL(action);
+  if (url.protocol === "https:" && url.host === "docs.google.com") return true;
+  var testHost = process.env.WEC_GOOGLE_FORM_TEST_HOST;
+  return !isProduction() && !!testHost && url.host === testHost;
 }
 
 function connectedForm() {
   var form = WEC.parseForm(process.env.WEC_APPLY_GOOGLE_FORM_URL);
   if (!form.ok) return { form: null, reason: "WEC_APPLY_GOOGLE_FORM_URL: " + form.reason };
-  if (!allowedHost(form.action)) return { form: null, reason: "WEC_APPLY_GOOGLE_FORM_URL is not a docs.google.com link" };
+  if (!allowedHost(form.action)) return { form: null, reason: "WEC_APPLY_GOOGLE_FORM_URL is not an https://docs.google.com link" };
   return { form: form, reason: "" };
 }
 
@@ -131,6 +150,58 @@ async function checkForm(form) {
   return { ok: problems.length === 0, problems: problems };
 }
 
+// ─── The cached public check ─────────────────────────────────────────────────
+// Module scope, so it lives as long as the function instance does. Keyed on the
+// setting, so changing the Form link is never answered from the old Form.
+var cache = null;   // { key, at, result }
+
+async function cachedCheck(form) {
+  var key = process.env.WEC_APPLY_GOOGLE_FORM_URL;
+  if (cache && cache.key === key && Date.now() - cache.at < CHECK_TTL_MS) return cache.result;
+  var result = await checkForm(form);
+  cache = { key: key, at: Date.now(), result: result };
+  return result;
+}
+
+// ─── Who may see the detailed check ──────────────────────────────────────────
+function sameSecret(a, b) {
+  var x = Buffer.from(String(a)), y = Buffer.from(String(b));
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+}
+
+function detailAllowed(url) {
+  var secret = process.env.WEC_SETUP_CHECK_KEY;
+  if (secret) return sameSecret(url.searchParams.get("key") || "", secret);
+  return !isProduction();
+}
+
+// ─── The rate limit ──────────────────────────────────────────────────────────
+// In memory, per function instance: a cold start or a second instance starts
+// from zero. It stops one person or one script hammering the Form, not a
+// determined attack; the docs recommend a Vercel Firewall rule on top.
+var hits = new Map();   // ip -> [timestamps]
+
+function clientIp(req) {
+  var fwd = req.headers["x-forwarded-for"];
+  var first = String(Array.isArray(fwd) ? fwd[0] : fwd || "").split(",")[0].trim();
+  return first || (req.socket && req.socket.remoteAddress) || "unknown";
+}
+
+function overLimit(ip) {
+  var now = Date.now();
+  var recent = (hits.get(ip) || []).filter(function (t) { return now - t < RATE_WINDOW_MS; });
+  if (recent.length >= RATE_LIMIT) { hits.set(ip, recent); return true; }
+  recent.push(now);
+  hits.set(ip, recent);
+  // Keep the map from growing without bound on a long-lived instance.
+  if (hits.size > 5000) {
+    hits.forEach(function (list, k) {
+      if (!list.length || now - list[list.length - 1] >= RATE_WINDOW_MS) hits.delete(k);
+    });
+  }
+  return false;
+}
+
 // ─── Plumbing ────────────────────────────────────────────────────────────────
 function send(res, status, body) {
   res.statusCode = status;
@@ -154,21 +225,36 @@ async function readJson(req) {
   try { return JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch (e) { return null; }
 }
 
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   if (req.method === "GET") {
+    var url = new URL(req.url || "/", "http://localhost");
     var setup = connectedForm();
-    if (!setup.form) return send(res, 200, { connected: false, problems: [setup.reason] });
-    var check = await checkForm(setup.form);
-    return send(res, 200, { connected: true, ready: check.ok, problems: check.problems });
+    if (url.searchParams.get("detail") === "1") {
+      if (!detailAllowed(url)) return send(res, 403, { error: "forbidden", message: "The detailed setup check needs the right key." });
+      if (!setup.form) return send(res, 200, { connected: false, ready: false, problems: [setup.reason] });
+      // Fresh, not cached: this is what somebody runs while fixing the Form.
+      var fresh = await checkForm(setup.form);
+      cache = { key: process.env.WEC_APPLY_GOOGLE_FORM_URL, at: Date.now(), result: fresh };
+      return send(res, 200, { connected: true, ready: fresh.ok, problems: fresh.problems });
+    }
+    // The public answer: two booleans. No question titles, no problems list.
+    if (!setup.form) return send(res, 200, { connected: false, ready: false });
+    var check = await cachedCheck(setup.form);
+    return send(res, 200, { connected: true, ready: check.ok });
   }
   if (req.method !== "POST") {
     res.setHeader("Allow", "GET, POST");
     return send(res, 405, { error: "method_not_allowed" });
   }
 
+  if (overLimit(clientIp(req))) {
+    res.setHeader("Retry-After", String(Math.ceil(RATE_WINDOW_MS / 1000)));
+    return send(res, 429, { error: "rate_limited" });
+  }
+
   var connected = connectedForm();
   if (!connected.form) {
-    console.error("[apply] Google Form not connected:", connected.reason);
+    console.error(LOG + " Google Form not connected:", connected.reason);
     return send(res, 503, { error: "not_connected" });
   }
 
@@ -176,8 +262,12 @@ module.exports = async function handler(req, res) {
   if (!body || typeof body !== "object") return send(res, 400, { error: "bad_request" });
 
   // A hidden field no person ever sees. Bots fill every box in a form, so a
-  // filled one means a bot: say ok and send nothing at all.
-  if (body.website) return send(res, 200, { ok: true });
+  // filled one means a bot: say ok and send nothing at all. One line in the log
+  // so a real person caught by it can be spotted, and never their answers.
+  if (body[HONEYPOT]) {
+    console.warn(LOG + " honeypot filled in; told ok, nothing sent to Google.");
+    return send(res, 200, { ok: true });
+  }
 
   var answers = WEC.cleanSubmission(body);
   if (!answers) return send(res, 400, { error: "bad_request" });
@@ -205,16 +295,23 @@ module.exports = async function handler(req, res) {
       signal: AbortSignal.timeout(10000)
     });
     if (response.status !== 200) {
-      var why = await checkForm(connected.form).catch(function () { return { ok: false, problems: ["could not check the Form"] }; });
-      // The status and the likely cause, never the applicant's answers.
-      console.error("[apply] Google Form refused an application (status " + response.status + ").",
-        why.problems.length ? "Likely why: " + why.problems.join(" | ") : "The Form itself looks fine.",
-        "Full check: open /api/apply");
+      // The status only, never the applicant's answers. No second fetch to find
+      // out why: that could double the wait past the timeout. The cached check
+      // is dropped so the next page load reads the Form fresh, and the detailed
+      // check says in plain words what is wrong.
+      cache = null;
+      console.error(LOG + " Google Form refused an application (status " + response.status + ").",
+        "Run the detailed setup check: /api/exec-applications?detail=1&key=...");
       return send(res, 502, { error: "refused" });
     }
     return send(res, 200, { ok: true });
   } catch (error) {
-    console.error("[apply] Google Form unreachable:", error && error.name);
+    console.error(LOG + " Google Form unreachable:", error && error.name);
     return send(res, 502, { error: "unreachable" });
   }
-};
+}
+
+// For the tests only: forget the cached check and every rate-limit count.
+handler._reset = function () { cache = null; hits = new Map(); };
+
+module.exports = handler;

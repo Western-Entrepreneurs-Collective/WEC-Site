@@ -1,9 +1,10 @@
 /**
- * End to end tests for the apply path: the real api/apply.js, the real schema,
+ * End to end tests for the exec applications path: the real
+ * api/exec-applications.js, the real schema,
  * and a stand-in for Google (dev/fake-google.js) so the whole thing can be
  * proved without a Google account and without a row landing in a real Sheet.
  *
- *   node dev/test-apply.js
+ *   node dev/test-exec-applications.js
  *
  * What is actually proved here, one test each:
  *   1  a full valid application reaches Google with every answer in the right
@@ -22,18 +23,30 @@
  *  11  every email, phone, link and year rule is checked server side
  *  12  every paragraph is required and its word limit holds both ways
  *  13  one role's answers never carry into another role's submission
+ *  14  the page source opens only on connected AND ready
+ *  15  the public GET answers only { connected, ready }, and is cached
+ *  16  the detailed check needs the key, and is refused in production without one
+ *  17  the sixth POST from one address in ten minutes gets 429
+ *  18  the honeypot logs one line with no answers, and sends nothing
+ *  19  an over-long answer is refused with 400, never truncated
+ *  20  an http:// Google Form link is refused
+ *  21  the test host is ignored in production
  */
 "use strict";
 
 var http = require("http");
 var assert = require("assert");
 var fake = require("./fake-google.js");
-var WEC = require("../apply-schema.js");
+var fs = require("fs");
+var path = require("path");
+var WEC = require("../exec-applications-schema.js");
 
-var handler = require("../api/apply.js");
+var handler = require("../api/exec-applications.js");
 
 var passed = 0, failed = 0;
 async function test(name, fn) {
+  // Every test starts with no cached Form check and no rate-limit counts.
+  handler._reset();
   try { await fn(); passed++; console.log("  pass  " + name); }
   catch (e) { failed++; console.log("  FAIL  " + name + "\n        " + (e && e.message)); }
 }
@@ -74,15 +87,36 @@ async function main() {
     process.env.WEC_GOOGLE_FORM_TEST_HOST = "127.0.0.1:" + gPort;
   }
 
-  function post(body) {
-    return fetch(base, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+  // Each post comes from its own address unless one is given, so the tests that
+  // post dozens of applications are not stopped by the rate limit. Test 17
+  // gives one address on purpose.
+  var nextIp = 1;
+  function post(body, ip) {
+    var from = ip || "10.0." + Math.floor(nextIp / 250) + "." + (nextIp++ % 250 + 1);
+    return fetch(base, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Forwarded-For": from + ", 203.0.113.9" },
+      body: JSON.stringify(body)
+    }).then(function (r) { return r.json().then(function (d) { return { status: r.status, body: d }; }); });
+  }
+  function get(query) {
+    return fetch(base + "/api/exec-applications" + (query || ""))
       .then(function (r) { return r.json().then(function (d) { return { status: r.status, body: d }; }); });
   }
-  function get() {
-    return fetch(base).then(function (r) { return r.json().then(function (d) { return { status: r.status, body: d }; }); });
+  function detail() { return get("?detail=1"); }
+
+  // Captures console lines while fn runs, so a test can prove what was logged.
+  async function capture(fn) {
+    var lines = [];
+    var saved = { warn: console.warn, error: console.error, log: console.log };
+    ["warn", "error", "log"].forEach(function (k) {
+      console[k] = function () { lines.push(Array.prototype.join.call(arguments, " ")); };
+    });
+    try { await fn(); } finally { Object.assign(console, saved); }
+    return lines;
   }
 
-  console.log("\napply path, against a stand-in for Google on " + gOrigin + "\n");
+  console.log("\nexec applications path, against a stand-in for Google on " + gOrigin + "\n");
 
   await test("1  a full application reaches Google with every answer in the right entry", async function () {
     connect(); google.mode = "ok"; google.received = [];
@@ -153,7 +187,7 @@ async function main() {
   await test("5  the honeypot answers ok and sends nothing", async function () {
     connect(); google.mode = "ok"; google.received = [];
     var v = application("vp-community");
-    v.website = "http://spam.example";
+    v.wec_hp = "http://spam.example";
     var out = await post(v);
     assert.deepStrictEqual(out.body, { ok: true }, "a bot is told it worked");
     assert.strictEqual(google.received.length, 0, "and nothing at all is sent");
@@ -190,14 +224,15 @@ async function main() {
     assert.strictEqual(out.status, 503);
     assert.strictEqual(out.body.error, "not_connected");
     var setup = await get();
-    assert.strictEqual(setup.body.connected, false);
-    assert.ok(/not set/.test(setup.body.problems[0]));
+    assert.deepStrictEqual(setup.body, { connected: false, ready: false });
+    var why = await detail();
+    assert.ok(/not set/.test(why.body.problems[0]));
     assert.strictEqual(google.received.length, 0);
   });
 
   await test("9  the setup check says in plain words what is wrong with the Form", async function () {
     connect(); google.mode = "ok";
-    var good = await get();
+    var good = await detail();
     assert.strictEqual(good.body.connected, true);
     assert.deepStrictEqual(good.body.problems, [], "a correctly built Form has no problems: " + JSON.stringify(good.body.problems));
     assert.strictEqual(good.body.ready, true);
@@ -213,7 +248,7 @@ async function main() {
     var bPort = brokenServer.address().port;
     process.env.WEC_APPLY_GOOGLE_FORM_URL = fake.prefilledUrl("http://127.0.0.1:" + bPort);
     process.env.WEC_GOOGLE_FORM_TEST_HOST = "127.0.0.1:" + bPort;
-    var out = await get();
+    var out = await detail();
     assert.strictEqual(out.body.ready, false);
     assert.ok(out.body.problems.some(function (p) { return /options must be exactly/.test(p) && /1st Year/.test(p); }),
       "should name the year options: " + JSON.stringify(out.body.problems));
@@ -223,14 +258,14 @@ async function main() {
 
     // And a Form that requires a Google account.
     connect(); google.mode = "signin";
-    var signin = await get();
+    var signin = await detail();
     assert.ok(signin.body.problems.some(function (p) { return /sign in to Google/.test(p); }));
     google.mode = "ok";
   });
 
   // ── The server side of the validation. The browser checks the same rules out
   // of the same file, but the browser is never the only guard: every one of
-  // these posts goes straight at api/apply.js, with no page involved at all.
+  // these posts goes straight at api/exec-applications.js, with no page involved at all.
 
   await test("10  every required field, emptied on its own, is refused with its own sentence", async function () {
     connect(); google.mode = "ok"; google.received = [];
@@ -360,6 +395,157 @@ async function main() {
     fake2.roleKey = "vp-vibes";
     assert.strictEqual((await post(fake2)).status, 400);
     assert.strictEqual(google.received.length, 0);
+  });
+
+  // ── The review fixes ─────────────────────────────────────────────────────
+
+  await test("14  the page opens only on connected AND ready; connected but not ready stays closed", async function () {
+    // The page is browser code, so this reads its source for the one decision
+    // and runs that decision against the three answers the server can give.
+    var src = fs.readFileSync(path.join(__dirname, "..", "exec-applications", "exec-applications.js"), "utf8");
+    var m = src.match(/setOpen\((Boolean\(d && [^;]*\))\);/);
+    assert.ok(m, "the page should decide open from the API answer");
+    var decide = new Function("d", "return " + m[1] + ";");
+    assert.strictEqual(decide({ connected: true, ready: true }), true);
+    assert.strictEqual(decide({ connected: true, ready: false }), false, "connected but not ready must stay closed");
+    assert.strictEqual(decide({ connected: false, ready: false }), false);
+    assert.strictEqual(decide({ connected: true }), false, "a missing ready is not ready");
+    // And the server does say connected-but-not-ready for a Form Google would refuse.
+    connect(); google.mode = "closed";
+    var out = await get();
+    assert.deepStrictEqual(out.body, { connected: true, ready: false });
+    google.mode = "ok";
+  });
+
+  await test("15  the public GET answers only { connected, ready }, and reuses its check", async function () {
+    connect(); google.mode = "ok";
+    var before = google.views;
+    var out = await get();
+    assert.strictEqual(out.status, 200);
+    assert.deepStrictEqual(Object.keys(out.body).sort(), ["connected", "ready"], "no problems list, no question titles");
+    assert.deepStrictEqual(out.body, { connected: true, ready: true });
+    await get(); await get();
+    assert.strictEqual(google.views - before, 1, "three page views, one Google fetch: " + (google.views - before));
+    // A broken Form shows no detail publicly either.
+    handler._reset(); google.mode = "signin";
+    var closed = await get();
+    assert.deepStrictEqual(closed.body, { connected: true, ready: false });
+    google.mode = "ok";
+  });
+
+  await test("16  the detailed check needs the key, and production without a key refuses it", async function () {
+    connect(); google.mode = "ok";
+    var savedEnv = process.env.VERCEL_ENV;
+    try {
+      process.env.WEC_SETUP_CHECK_KEY = "s3cret-check-key";
+      assert.strictEqual((await detail()).status, 403, "no key given");
+      assert.strictEqual((await get("?detail=1&key=wrong")).status, 403, "wrong key");
+      assert.strictEqual((await get("?detail=1&key=s3cret-check-ke")).status, 403, "a prefix of the key");
+      var ok = await get("?detail=1&key=s3cret-check-key");
+      assert.strictEqual(ok.status, 200);
+      assert.deepStrictEqual(ok.body.problems, [], "the right key gets the problems list");
+      delete process.env.WEC_SETUP_CHECK_KEY;
+      process.env.VERCEL_ENV = "production";
+      var prod = await detail();
+      assert.strictEqual(prod.status, 403, "production with no key set: no detail for anybody");
+      assert.strictEqual(prod.body.problems, undefined);
+      process.env.VERCEL_ENV = "preview";
+      assert.strictEqual((await detail()).status, 200, "a preview deployment with no key set may show it");
+    } finally {
+      delete process.env.WEC_SETUP_CHECK_KEY;
+      if (savedEnv === undefined) delete process.env.VERCEL_ENV; else process.env.VERCEL_ENV = savedEnv;
+    }
+  });
+
+  await test("17  the sixth POST from one address in ten minutes gets 429, and nothing is sent for it", async function () {
+    connect(); google.mode = "ok"; google.received = [];
+    var ip = "198.51.100.7";
+    for (var i = 1; i <= 5; i++) {
+      var out = await post(application("outreach"), ip);
+      assert.deepStrictEqual(out.body, { ok: true }, "post " + i + " should go through");
+    }
+    var sixth = await post(application("outreach"), ip);
+    assert.strictEqual(sixth.status, 429);
+    assert.strictEqual(sixth.body.error, "rate_limited");
+    assert.strictEqual(google.received.length, 5, "the sixth never reached Google");
+    // Another address is not affected.
+    assert.deepStrictEqual((await post(application("outreach"), "198.51.100.8")).body, { ok: true });
+    // The page has a plain message for it.
+    var src = fs.readFileSync(path.join(__dirname, "..", "exec-applications", "exec-applications.js"), "utf8");
+    assert.ok(/rate_limited/.test(src) && /Too many tries/.test(src), "the page should say something plain on 429");
+  });
+
+  await test("18  the honeypot logs one line with no answers in it, and sends nothing", async function () {
+    connect(); google.mode = "ok"; google.received = [];
+    var v = application("vp-community");
+    v.wec_hp = "filled by a bot";
+    var out;
+    var lines = await capture(async function () { out = await post(v); });
+    assert.deepStrictEqual(out.body, { ok: true });
+    assert.strictEqual(google.received.length, 0);
+    assert.strictEqual(lines.length, 1, "exactly one log line: " + JSON.stringify(lines));
+    assert.ok(/\[exec-applications\] honeypot/.test(lines[0]), lines[0]);
+    ["Amara", "aosei@uwo.ca", "filled by a bot", "I build things"].forEach(function (secret) {
+      assert.strictEqual(lines[0].indexOf(secret), -1, "the log line must not carry " + secret);
+    });
+    // The old name is not the trap any more: a browser autofilling "website"
+    // must not get a real applicant dropped.
+    var real = application("vp-community");
+    real.website = "https://amara.build";
+    assert.deepStrictEqual((await post(real)).body, { ok: true });
+    assert.strictEqual(google.received.length, 1, "an application carrying a website field still goes through");
+  });
+
+  await test("19  an answer over 8,000 characters gets 400 with a sentence, never cut short", async function () {
+    connect(); google.mode = "ok"; google.received = [];
+    var v = application("vp-content");
+    v.program = "x".repeat(WEC.MAX_CHARS + 1);
+    var out = await post(v);
+    assert.strictEqual(out.status, 400);
+    assert.strictEqual(out.body.error, "invalid");
+    assert.ok(/8,001 characters/.test(out.body.errors.program) && /8,000/.test(out.body.errors.program), out.body.errors.program);
+    // A long answer under its word limit but over the characters: one giant "word".
+    var w = application("vp-content");
+    w.g1 = "a".repeat(9000);
+    var out2 = await post(w);
+    assert.strictEqual(out2.status, 400);
+    assert.ok(/characters/.test(out2.body.errors.g1));
+    // Exactly at the limit is fine.
+    var edge = application("vp-content");
+    edge.program = "x".repeat(WEC.MAX_CHARS);
+    assert.deepStrictEqual((await post(edge)).body, { ok: true });
+    assert.strictEqual(google.received[0][fake.ENTRY.program].length, WEC.MAX_CHARS, "sent whole, not truncated");
+    assert.strictEqual(google.received.length, 1);
+  });
+
+  await test("20  a Google Form link over plain http is refused", async function () {
+    var httpsLink = fake.prefilledUrl("https://docs.google.com");
+    connect(httpsLink.replace("https://", "http://"));
+    // No test host for this one: only the real Google rule applies.
+    delete process.env.WEC_GOOGLE_FORM_TEST_HOST;
+    google.received = [];
+    assert.deepStrictEqual((await get()).body, { connected: false, ready: false });
+    assert.ok(/https:\/\/docs\.google\.com/.test((await detail()).body.problems[0]));
+    var out = await post(application("outreach"));
+    assert.strictEqual(out.status, 503);
+    assert.strictEqual(google.received.length, 0);
+  });
+
+  await test("21  WEC_GOOGLE_FORM_TEST_HOST is ignored in production", async function () {
+    connect(); google.mode = "ok"; google.received = [];
+    var savedEnv = process.env.VERCEL_ENV;
+    try {
+      process.env.VERCEL_ENV = "production";
+      var out = await post(application("outreach"));
+      assert.strictEqual(out.status, 503, "in production the stand-in host must not be accepted");
+      assert.strictEqual(google.received.length, 0, "nothing reached the test host");
+      assert.deepStrictEqual((await get()).body, { connected: false, ready: false });
+      delete process.env.VERCEL_ENV;
+      handler._reset();
+      assert.deepStrictEqual((await post(application("outreach"))).body, { ok: true }, "outside production it is used");
+    } finally {
+      if (savedEnv === undefined) delete process.env.VERCEL_ENV; else process.env.VERCEL_ENV = savedEnv;
+    }
   });
 
   console.log("\n" + passed + " passed, " + failed + " failed\n");

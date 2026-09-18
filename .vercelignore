@@ -1,0 +1,4 @@
+# Local tools and setup notes, not part of the public site.
+# api/ and exec-applications-schema.js must NOT be listed here: the function needs both.
+/dev/
+/docs/

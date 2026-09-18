@@ -1,4 +1,7 @@
 const COPY = window.WEC_COPY;
+// The executive applications page. A placeholder path: the club picks the final one.
+// Change it here and rename the exec-applications/ folder to match (docs/APPLICATIONS-FORM.md).
+const EXEC_APPLICATIONS_PATH = "/exec-applications/";
 function Sl({ w = 15, h = 3, style }) {
   return /* @__PURE__ */ React.createElement("span", { className: "sl", style: { width: w, height: h, ...style } });
 }
@@ -157,12 +160,12 @@ function Close({ go }) {
   }, className: "btn btn-light" }, /* @__PURE__ */ React.createElement(Sl, { w: 13 }), COPY.cta), /* @__PURE__ */ React.createElement(
     "a",
     {
-      href: "/apply/",
+      href: EXEC_APPLICATIONS_PATH,
       className: "btn btn-out"
     },
     /* @__PURE__ */ React.createElement(Sl, { w: 13 }),
-    "Apply to the exec team"
-  )), /* @__PURE__ */ React.createElement("p", { className: "note note-lt" }, COPY.note), /* @__PURE__ */ React.createElement("p", { className: "note note-lt" }, "Joining the cohort and helping run WEC are two different things. Applications for the ", /* @__PURE__ */ React.createElement("a", { href: "/apply/", style: { color: "inherit", textDecoration: "underline", fontWeight: 600 } }, "2026-27 executive team"), " are separate, and take about twenty five minutes.")));
+    "Exec team applications"
+  )), /* @__PURE__ */ React.createElement("p", { className: "note note-lt" }, COPY.note), /* @__PURE__ */ React.createElement("p", { className: "note note-lt" }, "Joining the cohort and helping run WEC are two different things. Applications for the ", /* @__PURE__ */ React.createElement("a", { href: EXEC_APPLICATIONS_PATH, style: { color: "inherit", textDecoration: "underline", fontWeight: 600 } }, "2026-27 executive team"), " are separate, and take about twenty five minutes.")));
 }
 function HomePage({ go }) {
   return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Hero, { go }), /* @__PURE__ */ React.createElement("div", { className: "hero-cut" }), /* @__PURE__ */ React.createElement(Marquee, null), /* @__PURE__ */ React.createElement(Principles, null), /* @__PURE__ */ React.createElement(Scrubber, null), /* @__PURE__ */ React.createElement(Close, { go }));

@@ -1,8 +1,13 @@
 # Connecting the executive applications page to a Google Form
 
-The applications page at **`/apply/`** is built and works. It has nowhere to send
-an application yet, so until the steps below are done it says, in plain words,
-that applications are not open. It never pretends to submit.
+The executive applications page at **`/exec-applications/`** is built and works.
+It has nowhere to send an application yet, so until the steps below are done it
+says, in plain words, that applications are not open. It never pretends to submit.
+
+⛔ **The "apply" path is not this page.** It belongs to the member sign-up (the Join
+form, "Apply / Four questions"). The exec page and its API stay off it. And
+`/exec-applications/` is itself a **placeholder**: see section 9, "Choosing the
+final URL".
 
 Everything an applicant types goes into ONE place: a Google Form, which writes it
 into that Form's linked Google Sheet. **The Sheet is the only store.** There is no
@@ -116,10 +121,14 @@ Then **redeploy**.
 
 - It is **server side only**. It has no `NEXT_PUBLIC_` style prefix and is never
   sent to a browser, so nobody can find the Form and post to it directly.
-- `WEC_GOOGLE_FORM_TEST_HOST` is the second setting. **Leave it unset in
-  production.** It exists so the whole path can be tested against a local
-  stand-in for Google (`dev/serve.js`), and it is the only way anything other
-  than `docs.google.com` can ever receive an application.
+- The link must be **`https://docs.google.com/...`**. An `http://` link, or any
+  other host, is refused and the page stays closed.
+- `WEC_GOOGLE_FORM_TEST_HOST` is only for testing against a local stand-in for
+  Google (`dev/serve.js`). **It is ignored whenever `VERCEL_ENV` is
+  `production`**, so even if it is set there by mistake, nothing but
+  `docs.google.com` can ever receive an application.
+- `WEC_SETUP_CHECK_KEY` (optional, recommended): any long random string. It is
+  the password for the detailed setup check in section 4.
 
 Locally: `node dev/serve.js` starts the site with a stand-in for Google already
 wired up, so the page can be driven end to end offline.
@@ -128,13 +137,28 @@ wired up, so the page can be driven end to end offline.
 
 ## 4. Check the setup before telling anyone
 
-Open **`<the site>/api/apply`** in a browser. It reads the Form the way a visitor
-sees it and answers in plain words:
+Open **`<the site>/api/exec-applications?detail=1&key=<WEC_SETUP_CHECK_KEY>`**
+in a browser. It reads the Form fresh, the way a visitor sees it, and answers in
+plain words:
 
 - `{"connected":true,"ready":true,"problems":[]}` means everything lines up.
 - Otherwise `problems` lists exactly what to fix, for example
   *"The 'Year of study' question's options must be exactly: 1st Year, 2nd Year,
   ... Missing: Graduate, Other. Rename or remove: Grad."*
+
+**Who can see the detail:**
+
+| `WEC_SETUP_CHECK_KEY` | Where | `?detail=1` |
+|---|---|---|
+| set | anywhere | only with `&key=` equal to it; otherwise 403 |
+| unset | preview deployments and locally | works without a key |
+| unset | production (`VERCEL_ENV=production`) | always 403 |
+
+**The public answer** (`/api/exec-applications` with no `detail`) is only
+`{"connected":…,"ready":…}`: no question titles, no problems. The page opens only
+when **both** are true. It is cached for **5 minutes** per function instance, so
+page views do not each fetch the Form from Google; after fixing the Form, run the
+detailed check once, which refreshes it immediately.
 
 Then apply once yourself, all the way through, and check the row lands in the
 Sheet. Delete the test row.
@@ -156,7 +180,7 @@ So the page asks for a **link**: a Drive or Dropbox file set to "anyone with the
 link", a LinkedIn profile, or the applicant's own site. It is required.
 
 When the club has Drive credentials, this becomes a real upload and only two
-things change: the `resume` field in `apply-schema.js` and question 9 in the
+things change: the `resume` field in `exec-applications-schema.js` and question 9 in the
 Form. Nothing else on the page depends on it.
 
 ---
@@ -275,11 +299,11 @@ application is accurate." Then Submit.
 
 ## 7. To change a question
 
-Edit `apply-schema.js`. It is the only file with the questions in it, and both
+Edit `exec-applications-schema.js`. It is the only file with the questions in it, and both
 the page and the server read it, so they can never disagree. Then update the
 Google Form to match and redo steps 2 and 3.
 
-Run `node dev/test-apply.js` afterwards. It proves, against a stand-in for
+Run `node dev/test-exec-applications.js` afterwards. It proves, against a stand-in for
 Google, that a full application lands with every answer in the right place, that
 a refusal is reported as a failure rather than a success, and that only the
 chosen role's answers are sent.
@@ -295,3 +319,69 @@ Google refuses, the log records the status and the likely cause, never what
 anybody wrote.
 
 **Applicants should finish in one sitting.** The page says so before they start.
+
+---
+
+## 9. Choosing the final URL
+
+**`/exec-applications/` is a placeholder.** The club decides the final path. It
+must not be the "apply" path or anything under it: that belongs to the member sign-up.
+
+On Vercel a folder's name IS the page's URL and a file in `api/` IS its
+endpoint's URL, so the path lives in the file layout plus one constant per
+environment. To change `/exec-applications/` to, say, `/team-applications/`:
+
+| What | File | Line | Change |
+|---|---|---|---|
+| the page (Vercel) | `exec-applications/` folder | | `git mv exec-applications team-applications` |
+| home page button and text link | `app.js` | 4 | `const EXEC_APPLICATIONS_PATH = "/team-applications/";` |
+| local dev server | `dev/serve.js` | 31 | `var PAGE_PATH = "/team-applications/";` |
+
+The page loads everything by relative path (`../launch.css`,
+`../exec-applications-schema.js`, `../vendor/...`), so it keeps working in any
+folder one level below the site root.
+
+**The API path** only needs changing if the club wants that renamed too. If so:
+
+| What | File | Line | Change |
+|---|---|---|---|
+| the endpoint (Vercel) | `api/exec-applications.js` | | `git mv` to the new name |
+| where the page posts | `exec-applications/exec-applications.js` | 30 | `var API_PATH = ...` |
+| local dev server | `dev/serve.js` | 32 and 33 | `API_PATH` and `API_FILE` |
+| the tests | `dev/test-exec-applications.js` | 44 and 103 | the `require` and the GET path |
+| the log hint | `api/exec-applications.js` | 304 | the path in the "Run the detailed setup check" line |
+
+Then run `node dev/test-exec-applications.js`, start `node dev/serve.js`, and
+open the new path.
+
+---
+
+## 10. Abuse protection, and what is not public
+
+- **Rate limit.** At most **5 submissions per IP address per 10 minutes**
+  (the first address in `x-forwarded-for`, which Vercel sets). The 6th gets
+  **429** and the page says, in plain words, to wait ten minutes; nothing is
+  sent to Google for it. ⚠️ **The count is kept in memory and resets per
+  function instance**: a cold start, or a second instance serving at the same
+  time, starts from zero. It stops one person or one script hammering the Form,
+  not a determined attack. **Recommended on top: a Vercel Firewall rate-limit
+  rule** (Project → Firewall → Rules) on `POST /api/exec-applications`.
+- **Honeypot.** A hidden field named `wec_hp`, labelled "Leave this empty",
+  `autocomplete="off"`, `tabindex=-1`, `aria-hidden`. A filled one is answered
+  "ok", nothing is sent, and **one line is logged with no answers in it**. It is
+  deliberately not called `website`: a password manager or autofill could fill
+  that in for a real person and have them silently dropped.
+- **Over-long answers** (more than 8,000 characters in one field) are refused
+  with a 400 and a sentence naming the length. Nothing is ever cut short.
+- **`.vercelignore`** keeps `dev/` and `docs/` out of the deployment, so this
+  file and the test tools are not served publicly. `api/` and
+  `exec-applications-schema.js` are NOT ignored: the function needs both.
+
+---
+
+## Known issue: the Join form (not this page)
+
+The member sign-up at `/#/join` delivers by `mailto:`. Long answers make a long
+`mailto:` link, and some browsers and mail clients cap how long one can be (older
+ones at around 2,000 characters), so a very long Join application can arrive cut short.
+Left as is for now.

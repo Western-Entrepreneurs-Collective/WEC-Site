@@ -12,7 +12,7 @@
  *
  * No admin, no dashboard, no database, no login. Nothing is kept in
  * localStorage. Answers live in React state for as long as the tab is open and
- * go to exactly one place: the club's Google Form, through /api/apply, which
+ * go to exactly one place: the club's Google Form, through the API below, which
  * writes them into the Form's Sheet. The Sheet is the only store.
  *
  * THE ROUTING IS REAL ROUTING
@@ -24,7 +24,12 @@
 (function () {
   "use strict";
 
-  var W = window.WEC_APPLY;
+  var W = window.WEC_EXEC_APPLICATIONS;
+  // The one place this page names its server. A placeholder path, like the page's
+  // own: see "Choosing the final URL" in docs/APPLICATIONS-FORM.md.
+  var API_PATH = "/api/exec-applications";
+  // The hidden trap field. Must match HONEYPOT in api/exec-applications.js.
+  var HONEYPOT = "wec_hp";
   var h = React.createElement;
 
   // ─── Bits lifted from the main site so this page looks native ──────────────
@@ -53,7 +58,7 @@
   // ─── The stages ────────────────────────────────────────────────────────────
   // THERE IS NO LANDING PAGE. The page opens on stage 1, About you. The club
   // will design the applicant-facing landing page itself; until then somebody
-  // who opens /apply/ is already filling the form in, and the only thing above
+  // who opens this page is already filling the form in, and the only thing above
   // it is one line saying what they are filling in.
   var ABOUT = 1, GENERAL = 2, POSITION = 3, ROLEQ = 4, REVIEW = 5;
   var STAGES = [
@@ -137,18 +142,19 @@
     var c = React.useState(false); var confirmed = c[0], setConfirmed = c[1];
     var t = React.useState("idle"); var status = t[0], setStatus = t[1];
     // The honeypot. No person ever sees it; a bot fills every box it finds.
-    var hp = React.useState(""); var website = hp[0], setWebsite = hp[1];
+    var hp = React.useState(""); var trap = hp[0], setTrap = hp[1];
     // Set when an Edit button on the review page sent them back, so Continue can
     // take them straight back to the review instead of walking every stage again.
     var ed = React.useState(false); var editing = ed[0], setEditing = ed[1];
-    // null while we are still asking the server whether the Form is connected.
+    // null while we are still asking the server whether the Form is connected
+    // AND ready. Connected but not ready (a Form Google would refuse) is closed.
     var f = React.useState(null); var open = f[0], setOpen = f[1];
 
     React.useEffect(function () {
       var alive = true;
-      fetch("/api/apply", { headers: { Accept: "application/json" } })
+      fetch(API_PATH, { headers: { Accept: "application/json" } })
         .then(function (r) { return r.json(); })
-        .then(function (d) { if (alive) setOpen(Boolean(d && d.connected)); })
+        .then(function (d) { if (alive) setOpen(Boolean(d && d.connected && d.ready)); })
         // No answer from the API at all (a plain static host, an outage) is not
         // a reason to pretend applications are open.
         .catch(function () { if (alive) setOpen(false); });
@@ -159,8 +165,9 @@
 
     function set(id) {
       return function (ev) {
-        var next = Object.assign({}, v); next[id] = ev.target.value;
-        setV(next);
+        var value = ev.target.value;
+        // Functional, so two quick changes can never overwrite each other.
+        setV(function (prev) { var next = Object.assign({}, prev); next[id] = value; return next; });
         // Editing a field clears ITS error. Leaving it on screen after the fix
         // reads as "my correction did not work".
         if (err[id]) { var ne = Object.assign({}, err); delete ne[id]; setErr(ne); }
@@ -211,8 +218,9 @@
       if (Object.keys(problems).length) { setStatus("idle"); jumpToFirstProblem(); return; }
       if (!confirmed) { setStatus("unconfirmed"); return; }
       setStatus("sending");
-      var body = Object.assign({}, v, { website: website });
-      fetch("/api/apply", {
+      var body = Object.assign({}, v);
+      body[HONEYPOT] = trap;
+      fetch(API_PATH, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
       }).then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, d: d }; });
@@ -222,7 +230,8 @@
         if (out.d && out.d.error === "invalid" && out.d.errors) {
           setErr(out.d.errors); setStatus("idle"); jumpToFirstProblem(); return;
         }
-        setStatus(out.d && out.d.error === "not_connected" ? "closed" : "failed");
+        setStatus(out.d && out.d.error === "not_connected" ? "closed"
+          : out.d && out.d.error === "rate_limited" ? "limited" : "failed");
       }).catch(function () { setStatus("failed"); });
     }
 
@@ -252,7 +261,8 @@
     // which name of thing this is, and the stage they are on. No hero, no
     // pitch, no Start button.
     var pct = Math.round((step - 1) / (REVIEW - 1) * 100);
-    // NOT OPEN YET. With no Form connected there is nowhere for an application
+    // NOT OPEN YET. With no Form connected, or a connected Form that Google would
+    // refuse (the server says ready: false), there is nowhere for an application
     // to go, so the whole form is put inside a disabled fieldset: every input,
     // select, textarea, role card and button inside it stops responding, and
     // the browser will not let a disabled control be typed in or pressed. The
@@ -268,11 +278,11 @@
         h("p", { className: "phead-l" }, subtitleFor(step, role))),
         h("div", { className: "hero-cut" })),
       h("section", { className: "join" }, h("div", { className: "wrap join-in" },
-        h(Honeypot, { value: website, onChange: function (ev) { setWebsite(ev.target.value); } }),
+        h(Honeypot, { value: trap, onChange: function (ev) { setTrap(ev.target.value); } }),
 
         open === false ? h("div", { className: "ap-note bad", role: "status" }, h(Sl, { w: 13, h: 3, style: { marginTop: 7 } }),
           h("p", null, h("strong", null, "Applications are not open yet."),
-            " This page is live but it is not connected to anything that can receive an application, so nothing typed here would reach us. The questions below are shown so you know what to expect, and they cannot be filled in yet. Check back shortly, or email ",
+            " This page is live but it cannot receive an application yet, so nothing typed here would reach us. The questions below are shown so you know what to expect, and they cannot be filled in yet. Check back shortly, or email ",
             h("strong", null, "hello@wecollective.ca"), ".")) : null,
         open === null ? h("div", { className: "ap-note", role: "status" }, h(Sl, { w: 13, h: 3, style: { marginTop: 7 } }),
           h("p", null, "Checking whether applications are open...")) : null,
@@ -358,9 +368,11 @@
           + ". Switching to " + r.title + " will delete them, because the questions are different. Switch anyway?");
         if (!ok) return;
       }
-      var nv = Object.assign({}, v, { roleKey: r.key });
-      if (!already) W.ROLE_SLOTS.forEach(function (slot) { nv[slot.id] = ""; });
-      setV(nv);
+      setV(function (prev) {
+        var nv = Object.assign({}, prev, { roleKey: r.key });
+        if (!already) W.ROLE_SLOTS.forEach(function (slot) { nv[slot.id] = ""; });
+        return nv;
+      });
       var ne = Object.assign({}, err);
       delete ne.role;
       // The old role's error messages belong to questions that are gone.
@@ -438,6 +450,10 @@
           h("p", null, h("strong", null, "That didn't go through."),
             " Nothing was submitted and every answer above is still here. Press Submit again in a moment. If it keeps failing, email your answers to ",
             h("strong", null, "hello@wecollective.ca"), " and we will take it from there.")) : null,
+        status === "limited" ? h("div", { className: "ap-note bad" }, h(Sl, { w: 13, h: 3, style: { marginTop: 7 } }),
+          h("p", null, h("strong", null, "Too many tries from this connection."),
+            " Nothing was submitted and every answer above is still here. Wait ten minutes, then press Submit again. If it keeps happening, email your answers to ",
+            h("strong", null, "hello@wecollective.ca"), ".")) : null,
         status === "closed" ? h("div", { className: "ap-note bad" }, h(Sl, { w: 13, h: 3, style: { marginTop: 7 } }),
           h("p", null, h("strong", null, "Applications are not open yet."),
             " Nothing was submitted. Your answers are still here, so keep this tab open, or copy them somewhere safe.")) : null,
@@ -477,11 +493,18 @@
   }
 
   // The honeypot lives outside the visible form, off screen rather than
-  // display:none, because some bots skip fields that are display:none.
+  // display:none, because some bots skip fields that are display:none. Its name
+  // and label are deliberately nothing a password manager or autofill knows
+  // (not "website", "url", "name" or "email"), so a real person's browser never
+  // fills it in for them and gets them silently dropped.
   function Honeypot(props) {
     return h("div", { style: { position: "absolute", left: "-9999px", top: 0, width: 1, height: 1, overflow: "hidden" }, "aria-hidden": "true" },
-      h("label", null, "Website",
-        h("input", { type: "text", name: "website", tabIndex: -1, autoComplete: "off", value: props.value, onChange: props.onChange })));
+      h("label", null, "Leave this empty",
+        h("input", {
+          type: "text", name: HONEYPOT, id: HONEYPOT, tabIndex: -1, autoComplete: "off", "aria-hidden": "true",
+          "data-lpignore": "true", "data-1p-ignore": "true", "data-form-type": "other",
+          value: props.value, onChange: props.onChange
+        })));
   }
 
   ReactDOM.createRoot(document.getElementById("root")).render(h(ApplyPage, null));

@@ -2,9 +2,11 @@
  * WEC Executive Applications 2026-27: every question, its limit, and the link
  * to the club's Google Form. ONE file, read by BOTH sides:
  *
- *   - the browser (apply/apply.js) loads it as a plain script and reads
- *     window.WEC_APPLY, to draw the pages and check answers as they are typed;
- *   - the server (api/apply.js) requires it, to check the answers AGAIN and do
+ *   - the browser (exec-applications/exec-applications.js) loads it as a plain
+ *     script and reads window.WEC_EXEC_APPLICATIONS, to draw the pages and check
+ *     answers as they are typed;
+ *   - the server (api/exec-applications.js) requires it, to check the answers
+ *     AGAIN and do
  *     the actual sending.
  *
  * No build step, no bundler, no imports. That is the whole convention of this
@@ -21,7 +23,7 @@
  * source. Full steps are in docs/APPLICATIONS-FORM.md.
  *
  * It is SERVER SIDE ONLY. The browser never sees the Form's address and never
- * posts to Google itself: see api/apply.js for why that matters.
+ * posts to Google itself: see api/exec-applications.js for why that matters.
  */
 (function (root) {
   "use strict";
@@ -223,8 +225,17 @@
   var REQUIRED = ["name", "westernEmail", "personalEmail", "year", "program", "resume", "intro", "g1", "g2", "role", "r1", "r2", "r3"];
 
   // Long enough for the longest answer plus its question text, short enough that
-  // nobody can post a novel. 250 words is about 1,700 characters.
+  // nobody can post a novel. 250 words is about 1,700 characters. An answer over
+  // it is REFUSED with a sentence saying so, never cut short: a silently
+  // truncated answer is an applicant's words changed without them knowing.
   var MAX_CHARS = 8000;
+
+  function tooLong(text) {
+    var n = String(text || "").length;
+    return n > MAX_CHARS
+      ? "That is " + n.toLocaleString("en-US") + " characters. The most one answer can hold is " + MAX_CHARS.toLocaleString("en-US") + "."
+      : null;
+  }
 
   function roleByKey(key) {
     for (var i = 0; i < ROLES.length; i++) if (ROLES[i].key === key) return ROLES[i];
@@ -276,6 +287,7 @@
   function linkProblem(raw, required) {
     var value = String(raw || "").trim();
     if (!value) return required ? "Please paste a link." : null;
+    if (tooLong(value)) return tooLong(value);
     if (!/^https?:\/\//i.test(value)) return "Please start the link with https:// so it opens.";
     if (!/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(value)) return "That doesn't look like a complete link.";
     return null;
@@ -304,6 +316,7 @@
   // anything is sent, so the two can never disagree.
   function checkField(field, value) {
     var text = String(value || "").trim();
+    if (tooLong(text)) return tooLong(text);
     if (field.kind === "email") return emailProblem(text, field.rule);
     if (field.kind === "phone") return phoneProblem(text, field.req);
     if (field.kind === "url") return linkProblem(text, field.req);
@@ -416,8 +429,9 @@
     return out;
   }
 
-  // Untrusted JSON in, trimmed and capped answers out, or null if it is not an
-  // application at all.
+  // Untrusted JSON in, trimmed answers out, or null if it is not an application
+  // at all. Nothing is truncated here: checkField refuses an over-long answer
+  // with its own sentence, so the applicant is told instead of silently cut.
   function cleanSubmission(body) {
     if (!body || typeof body !== "object") return null;
     var v = blank();
@@ -426,7 +440,7 @@
       var k = keys[i];
       if (body[k] === undefined) continue;
       if (typeof body[k] !== "string") return null;
-      v[k] = body[k].trim().slice(0, MAX_CHARS);
+      v[k] = body[k].trim();
     }
     if (typeof body.roleKey !== "string" || !roleByKey(body.roleKey)) return null;
     return v;
@@ -445,5 +459,5 @@
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = API;
-  if (root) root.WEC_APPLY = API;
+  if (root) root.WEC_EXEC_APPLICATIONS = API;
 })(typeof window !== "undefined" ? window : null);
